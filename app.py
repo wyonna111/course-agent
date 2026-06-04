@@ -159,6 +159,10 @@ def init_session():
     for key in ("index_job_active", "rebuild_job_active", "ref_job_active", "qa_job_active"):
         if key not in st.session_state:
             st.session_state[key] = False
+    if "ref_upload_key" not in st.session_state:
+        st.session_state.ref_upload_key = 0
+    if "parsed_references" not in st.session_state:
+        st.session_state.parsed_references = []
 
 
 def is_app_busy() -> bool:
@@ -826,6 +830,17 @@ def _execute_rebuild_job(index: DocumentIndex, data_dir: Path, in_ws: bool) -> N
     st.rerun()
 
 
+def _clear_references_state(*, reset_inputs: bool = True) -> None:
+    """清空参考文献解析结果、任务状态与上传框。"""
+    st.session_state.ref_job_active = False
+    st.session_state.pop("ref_job_payload", None)
+    st.session_state.pop("ref_job_pending", None)
+    st.session_state.parsed_references = []
+    if reset_inputs:
+        st.session_state.ref_upload_key = int(st.session_state.get("ref_upload_key", 0)) + 1
+        st.session_state.ref_bib_text = ""
+
+
 def render_references_panel():
     if not ENABLE_REFERENCES:
         return
@@ -835,16 +850,52 @@ def render_references_panel():
         return
 
     busy = is_app_busy()
+    pending = st.session_state.get("ref_job_pending")
+    rows_all = st.session_state.get("parsed_references") or []
+    upload_key = int(st.session_state.get("ref_upload_key", 0))
 
-    with st.expander("📚 论文 DOI 工具（可选，与课内问答无关）", expanded=False):
+    with st.expander("📚 论文 DOI 工具（可选，与课内问答无关）", expanded=bool(rows_all or pending)):
         st.caption(
             "仅用于解析文末 References 里的 DOI 链接。"
             "**日常提问请用右侧对话**，系统会优先检索你上传的讲义/PPT。"
         )
+
+        if rows_all or pending:
+            c_clear, _ = st.columns([1, 2])
+            with c_clear:
+                if st.button(
+                    "清空并重新上传",
+                    use_container_width=True,
+                    key="ref_clear_btn",
+                ):
+                    _clear_references_state()
+                    st.rerun()
+
+        if pending:
+            label = pending.get("label") or "所选内容"
+            st.info(f"即将解析：**{label}**")
+            c_ok, c_no = st.columns(2)
+            with c_ok:
+                if st.button("确认解析", type="primary", use_container_width=True, key="ref_confirm_btn"):
+                    st.session_state.ref_job_payload = {
+                        k: pending[k]
+                        for k in ("fetch_meta", "file", "text")
+                        if k in pending
+                    }
+                    st.session_state.ref_job_active = True
+                    st.session_state.pop("ref_job_pending", None)
+                    st.rerun()
+            with c_no:
+                if st.button("取消", use_container_width=True, key="ref_cancel_pending_btn"):
+                    st.session_state.pop("ref_job_pending", None)
+                    st.rerun()
+            st.caption("文件选错了？点 **取消** 或 **清空并重新上传**。")
+            return
+
         ref_file = st.file_uploader(
             "参考文献 PDF/TXT",
             type=["pdf", "txt", "md"],
-            key="ref_bib_upload",
+            key=f"ref_bib_upload_{upload_key}",
             label_visibility="collapsed",
             disabled=busy,
         )
@@ -878,18 +929,25 @@ def render_references_panel():
                 job: dict = {"fetch_meta": fetch_meta}
                 if ref_file is not None:
                     job["file"] = {"name": ref_file.name, "data": ref_file.getvalue()}
+                    job["label"] = ref_file.name
                 else:
                     job["text"] = ref_text
-                st.session_state.ref_job_payload = job
-                st.session_state.ref_job_active = True
+                    preview = ref_text.strip().splitlines()[0][:40]
+                    job["label"] = preview + ("…" if len(ref_text.strip()) > 40 else "")
+                st.session_state.ref_job_pending = job
                 st.rerun()
 
-        rows = st.session_state.get("parsed_references") or []
+        rows = list(rows_all)
         if hide_table:
             rows = [r for r in rows if r.get("entry_type") != "table_row"]
         if not rows:
+            if rows_all:
+                st.caption("当前结果被筛选隐藏；取消勾选「隐藏表格行」可查看，或点「清空并重新上传」。")
             return
 
+        st.caption(
+            f"共 {len(rows)} 条 · 解析错了可点上方 **清空并重新上传** 换文件。"
+        )
         for i, row in enumerate(rows, 1):
             preview = row.get("preview") or row.get("entry", "")
             title = row.get("title") or ""

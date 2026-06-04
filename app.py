@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
 from openai import APIStatusError
 
 from src.chat import (
@@ -107,8 +106,7 @@ def render_ui_scripts() -> None:
     splitter_js = ""
     if SPLITTER_JS_PATH.exists():
         splitter_js = SPLITTER_JS_PATH.read_text(encoding="utf-8")
-    components.html(
-        f"""
+    html = f"""
         <script>
         (() => {{
           const doc = window.parent.document;
@@ -124,9 +122,13 @@ def render_ui_scripts() -> None:
         }})();
         {splitter_js}
         </script>
-        """,
-        height=0,
-    )
+        """
+    if hasattr(st, "iframe"):
+        st.iframe(html, height=0)
+    else:
+        import streamlit.components.v1 as components
+
+        components.html(html, height=0)
 
 
 def init_session():

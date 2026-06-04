@@ -124,7 +124,8 @@ def render_ui_scripts() -> None:
         </script>
         """
     if hasattr(st, "iframe"):
-        st.iframe(html, height=0)
+        # st.iframe 不允许 height=0，用 content 自动收缩
+        st.iframe(html, height="content")
     else:
         import streamlit.components.v1 as components
 

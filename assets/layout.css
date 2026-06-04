@@ -1,0 +1,317 @@
+/* 课内有据 — 左/右独立滚动（配合 st.container(height=…)） */
+
+:root {
+  --ct-primary: #4f7df3;
+  --ct-primary-soft: rgba(79, 125, 243, 0.12);
+  --ct-slate-50: #f8fafc;
+  --ct-slate-200: #e2e8f0;
+  --ct-slate-600: #475569;
+  --ct-sidebar-w: 280px;
+  --ct-splitter-w: 10px;
+  --ct-toolbar-h: 3.5rem;
+  --ct-chat-input-h: 76px;
+  --ct-radius: 12px;
+  --ct-radius-sm: 8px;
+  --ct-border: var(--ct-slate-200);
+  --ct-page-x: 1rem;
+  --ct-content-top: calc(var(--ct-toolbar-h) + 0.12rem);
+  --ct-font-tab: 0.96875rem;
+  --ct-font-title: 1.125rem;
+  --ct-font-body: 0.9375rem;
+}
+
+.stApp {
+  background: var(--ct-slate-50);
+}
+
+.stApp .main .block-container,
+.stApp .block-container {
+  padding-top: var(--ct-content-top) !important;
+  padding-bottom: var(--ct-chat-input-h) !important;
+  padding-left: var(--ct-page-x) !important;
+  padding-right: var(--ct-page-x) !important;
+  max-width: 100% !important;
+}
+
+section.main > div {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+header[data-testid="stHeader"] {
+  height: var(--ct-toolbar-h) !important;
+  min-height: var(--ct-toolbar-h) !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--ct-border) !important;
+  z-index: 990;
+}
+
+header[data-testid="stHeader"] > div {
+  height: var(--ct-toolbar-h) !important;
+  padding: 0 !important;
+}
+
+#ct-brand-bar.ct-brand-bar {
+  position: fixed;
+  top: 0;
+  left: var(--ct-page-x);
+  height: var(--ct-toolbar-h);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  z-index: 1001;
+  pointer-events: none;
+  max-width: min(520px, calc(100vw - 10rem));
+}
+
+.ct-brand-bar .ct-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ct-radius-sm);
+  flex-shrink: 0;
+  display: block;
+}
+
+.ct-brand-name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.ct-brand-slogan {
+  font-size: 0.8125rem;
+  color: var(--ct-slate-600);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+  padding-left: 0.55rem;
+  margin-left: 0.15rem;
+  border-left: 1px solid var(--ct-border);
+}
+
+footer {
+  visibility: hidden;
+}
+
+.ct-busy-banner {
+  position: fixed;
+  top: var(--ct-toolbar-h);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1002;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ct-thinking {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--ct-radius);
+  background: var(--ct-slate-50);
+  border: 1px dashed var(--ct-border);
+  color: var(--ct-slate-600);
+  font-size: var(--ct-font-body);
+  animation: ct-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ct-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ── 主分栏 ── */
+section.main div[data-testid="stHorizontalBlock"].ct-split-row,
+section.main div[data-testid="stHorizontalBlock"].ct-layout-row {
+  gap: 0 !important;
+  align-items: flex-start !important;
+}
+
+section.main div[data-testid="stHorizontalBlock"].ct-split-row > div[data-testid="column"]:first-child,
+section.main div[data-testid="stHorizontalBlock"].ct-layout-row > div[data-testid="column"]:first-child {
+  flex: 0 0 var(--ct-sidebar-w) !important;
+  width: var(--ct-sidebar-w) !important;
+  min-width: 180px !important;
+  max-width: 55vw !important;
+  position: sticky !important;
+  top: var(--ct-content-top) !important;
+  align-self: flex-start !important;
+  padding: 0.25rem 0.35rem 0.25rem 0 !important;
+}
+
+section.main div[data-testid="stHorizontalBlock"].ct-split-row > div[data-testid="column"]:last-child,
+section.main div[data-testid="stHorizontalBlock"].ct-layout-row > div[data-testid="column"]:last-child {
+  flex: 1 1 auto !important;
+  min-width: 280px !important;
+  padding: 0.25rem 0 0.25rem 0.35rem !important;
+}
+
+/* Streamlit 固定高度容器：必须可滚动 */
+section.main div[data-testid="column"] [data-testid="stVerticalBlockBorderWrapper"] {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  border: 1px solid var(--ct-border) !important;
+  border-radius: var(--ct-radius) !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+section.main div[data-testid="column"]:first-child [data-testid="stVerticalBlockBorderWrapper"] {
+  background: #ffffff !important;
+}
+
+section.main div[data-testid="column"]:last-child [data-testid="stVerticalBlockBorderWrapper"],
+section.main div[data-testid="column"]:last-child .ct-chat-scroll-root {
+  background: #ffffff !important;
+}
+
+section.main div[data-testid="stHorizontalBlock"].ct-split-row > div.ct-splitter {
+  flex: 0 0 var(--ct-splitter-w) !important;
+  width: var(--ct-splitter-w) !important;
+  min-height: 200px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 40;
+  align-self: stretch;
+}
+
+section.main div[data-testid="stHorizontalBlock"].ct-split-row > div.ct-splitter::before {
+  content: "";
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: 50%;
+  width: 3px;
+  transform: translateX(-50%);
+  border-radius: 3px;
+  background: var(--ct-slate-200);
+}
+
+section.main div[data-testid="stHorizontalBlock"].ct-split-row > div.ct-splitter:hover::before,
+section.main div[data-testid="stHorizontalBlock"].ct-split-row > div.ct-splitter.ct-dragging::before {
+  background: var(--ct-primary);
+  width: 4px;
+}
+
+/* Tab 字号 */
+section.main div[data-testid="column"]:first-child [data-testid="stTabs"] button {
+  font-size: var(--ct-font-tab) !important;
+  padding: 0.5rem 0.55rem !important;
+  font-weight: 500 !important;
+}
+
+section.main div[data-testid="column"]:first-child [data-testid="stTabs"] button[aria-selected="true"] {
+  color: var(--ct-primary) !important;
+  border-bottom: 2px solid var(--ct-primary) !important;
+  font-weight: 700 !important;
+}
+
+section.main div[data-testid="column"]:first-child p,
+section.main div[data-testid="column"]:first-child label,
+section.main div[data-testid="column"]:first-child .stCaption {
+  font-size: var(--ct-font-body) !important;
+}
+
+.ct-chat-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px solid var(--ct-border);
+}
+
+.ct-chat-title {
+  font-size: var(--ct-font-title);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.ct-chat-sub {
+  font-size: 0.8125rem;
+  color: var(--ct-slate-600);
+  margin: 0;
+}
+
+.ct-empty-hint {
+  margin: 0.5rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--ct-radius-sm);
+  background: var(--ct-slate-50);
+  border: 1px dashed var(--ct-border);
+  font-size: var(--ct-font-body);
+  color: var(--ct-slate-600);
+}
+
+.ct-qa-sticky-q {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 0 0.5rem 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--ct-radius-sm);
+  background: var(--ct-primary-soft);
+  border-left: 3px solid var(--ct-primary);
+  font-size: var(--ct-font-body);
+}
+
+section.main div[data-testid="column"]:last-child [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] {
+  background: var(--ct-slate-50);
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius);
+  padding: 0.85rem 1rem !important;
+  font-size: var(--ct-font-body);
+  line-height: 1.65;
+}
+
+div[data-testid="stChatInput"] {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: calc(var(--ct-sidebar-w) + var(--ct-splitter-w) + var(--ct-page-x) + 0.55rem) !important;
+  right: var(--ct-page-x) !important;
+  z-index: 999 !important;
+  padding: 0.5rem 0 0.7rem 0 !important;
+  background: linear-gradient(to top, #ffffff 78%, rgba(255, 255, 255, 0)) !important;
+}
+
+div[data-testid="stChatInput"] > div {
+  border: 1px solid var(--ct-border) !important;
+  border-radius: var(--ct-radius) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+  background: #ffffff !important;
+}
+
+@media (max-width: 900px) {
+  section.main div[data-testid="stHorizontalBlock"].ct-split-row > div[data-testid="column"]:first-child {
+    position: static !important;
+  }
+
+  div[data-testid="stChatInput"] {
+    left: var(--ct-page-x) !important;
+    right: var(--ct-page-x) !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  section.main div[data-testid="column"] [data-testid="stVerticalBlockBorderWrapper"] {
+    background: var(--secondary-background-color) !important;
+  }
+
+  div[data-testid="stChatInput"] > div {
+    background: var(--secondary-background-color) !important;
+  }
+}

@@ -11,6 +11,8 @@ import json
 import os
 from pathlib import Path
 
+from urllib.parse import urlparse
+
 import streamlit as st
 from openai import APIStatusError
 
@@ -539,6 +541,19 @@ def render_sources(
                 st.divider()
 
 
+def _app_base_url() -> str:
+    """协作分享用的站点根地址：线上优先用当前访问 URL，避免 Secrets 里旧域名。"""
+    try:
+        current = getattr(st.context, "url", None) or ""
+        if current and not current.startswith(("http://localhost", "http://127.0.0.1")):
+            parts = urlparse(current)
+            if parts.scheme and parts.netloc:
+                return f"{parts.scheme}://{parts.netloc}".rstrip("/")
+    except Exception:
+        pass
+    return PUBLIC_APP_URL
+
+
 def render_workspace_panel():
     """协作空间：邀请码创建 / 加入，共享会话与资料。"""
     if not ENABLE_WORKSPACE:
@@ -557,15 +572,13 @@ def render_workspace_panel():
     if wid:
         st.success(f"已加入：**{st.session_state.workspace_name or wid}**")
         st.markdown(f"邀请码：`{wid}`")
-        if PUBLIC_APP_URL:
-            share = f"{PUBLIC_APP_URL}/?space={wid}"
+        base = _app_base_url()
+        if base:
+            share = f"{base}/?space={wid}"
             st.markdown(f"**分享给队友：** [{share}]({share})")
             st.caption("队友用浏览器打开上方链接即可，无需安装代码。")
         else:
-            st.caption(
-                "把邀请码发给队友；若已部署到公网，在 Secrets 里设置 "
-                "`PUBLIC_APP_URL` 后可显示完整链接。"
-            )
+            st.caption("把邀请码发给队友；公网部署后会自动显示完整分享链接。")
             st.caption(f"链接格式：`你的网址/?space={wid}`")
         c1, c2 = st.columns(2)
         with c1:

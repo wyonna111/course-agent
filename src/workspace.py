@@ -13,6 +13,7 @@ import json
 import random
 import string
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,10 @@ from src.chat_history import sanitize_chat_messages
 # 易读邀请码字符（去掉 0/O、1/I/L）
 _CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _CODE_LEN = 6
+# 最近活跃视为「在线」
+ONLINE_THRESHOLD_SEC = 300
+# 心跳写入间隔，避免每次 rerun 都写盘
+MEMBER_TOUCH_INTERVAL_SEC = 30
 
 
 class WorkspaceError(Exception):
@@ -92,6 +97,7 @@ def create_workspace(name: str = "复习小组") -> dict[str, Any]:
         "name": name.strip() or "复习小组",
         "invite_code": wid,
         "messages": [],
+        "members": [],
         "created_at": time.time(),
         "updated_at": time.time(),
     }
@@ -141,4 +147,119 @@ def list_workspace_files(workspace_id: str) -> list[str]:
         p.name
         for p in d.iterdir()
         if p.is_file() and p.suffix.lower() in {".pdf", ".pptx", ".ppt", ".txt", ".md"}
+    )
+
+
+def _bootstrap_members_from_messages(messages: list[dict]) -> list[dict]:
+    """从旧版对话里的 author 字段补全成员列表。"""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for m in messages or []:
+        if m.get("role") != "user":
+            continue
+        name = (m.get("author") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append(
+            {
+                "id": f"legacy-{uuid.uuid5(uuid.NAMESPACE_DNS, name).hex[:12]}",
+                "name": name,
+                "joined_at": 0.0,
+                "last_seen": 0.0,
+            }
+        )
+    return out
+
+
+def list_workspace_members(workspace_id: str) -> list[dict[str, Any]]:
+    meta = load_workspace(workspace_id)
+    members = meta.get("members")
+    dirty = False
+    if not isinstance(members, list) or not members:
+        boot = _bootstrap_members_from_messages(meta.get("messages", []))
+        members = boot if boot else []
+        meta["members"] = members
+        dirty = True
+    if dirty:
+        save_workspace_meta(workspace_id, meta)
+    return sorted(
+        members,
+        key=lambda m: (-float(m.get("last_seen") or 0), m.get("name") or ""),
+    )
+
+
+def upsert_workspace_member(
+    workspace_id: str, member_id: str, name: str
+) -> list[dict[str, Any]]:
+    """登记或更新成员昵称与最近活跃时间。"""
+    name = (name or "").strip()
+    if not name or not member_id:
+        return list_workspace_members(workspace_id)
+
+    meta = load_workspace(workspace_id)
+    raw_members = meta.get("members")
+    if isinstance(raw_members, list) and raw_members:
+        members = list(raw_members)
+    else:
+        members = _bootstrap_members_from_messages(meta.get("messages", []))
+    now = time.time()
+    changed = False
+
+    for item in members:
+        if item.get("id") != member_id:
+            continue
+        if item.get("name") != name:
+            item["name"] = name
+            changed = True
+        last_seen = float(item.get("last_seen") or 0)
+        if now - last_seen >= MEMBER_TOUCH_INTERVAL_SEC:
+            item["last_seen"] = now
+            changed = True
+        if changed:
+            meta["members"] = members
+            save_workspace_meta(workspace_id, meta)
+        return sorted(
+            members,
+            key=lambda m: (-float(m.get("last_seen") or 0), m.get("name") or ""),
+        )
+
+    members.append(
+        {
+            "id": member_id,
+            "name": name,
+            "joined_at": now,
+            "last_seen": now,
+        }
+    )
+    meta["members"] = members
+    save_workspace_meta(workspace_id, meta)
+    return sorted(
+        members,
+        key=lambda m: (-float(m.get("last_seen") or 0), m.get("name") or ""),
+    )
+
+
+def member_activity_label(last_seen: float, *, now: float | None = None) -> str:
+    now = now if now is not None else time.time()
+    if not last_seen:
+        return "曾参与"
+    delta = max(0.0, now - float(last_seen))
+    if delta < 60:
+        return "刚刚活跃"
+    if delta < ONLINE_THRESHOLD_SEC:
+        return "在线"
+    if delta < 3600:
+        return f"{int(delta // 60)} 分钟前"
+    if delta < 86400:
+        return f"{int(delta // 3600)} 小时前"
+    return f"{int(delta // 86400)} 天前"
+
+
+def count_online_members(members: list[dict[str, Any]], *, now: float | None = None) -> int:
+    now = now if now is not None else time.time()
+    return sum(
+        1
+        for m in members
+        if (now - float(m.get("last_seen") or 0)) < ONLINE_THRESHOLD_SEC
     )

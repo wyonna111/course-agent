@@ -9,6 +9,7 @@ import base64
 import html
 import json
 import os
+import uuid
 from pathlib import Path
 
 from urllib.parse import urlparse
@@ -69,12 +70,16 @@ from src.web_search import search_web
 from src.workspace import (
     WorkspaceError,
     append_workspace_message,
+    count_online_members,
     create_workspace,
     get_workspace_data_dir,
     join_workspace,
+    list_workspace_members,
     load_workspace_messages,
+    member_activity_label,
     normalize_code,
     save_workspace_messages,
+    upsert_workspace_member,
     workspace_exists,
 )
 
@@ -147,6 +152,8 @@ def init_session():
         st.session_state.workspace_name = ""
     if "member_name" not in st.session_state:
         st.session_state.member_name = ""
+    if "member_id" not in st.session_state:
+        st.session_state.member_id = str(uuid.uuid4())
     if "_messages_loaded" not in st.session_state:
         st.session_state._messages_loaded = False
     for key in ("index_job_active", "rebuild_job_active", "ref_job_active", "qa_job_active"):
@@ -554,6 +561,30 @@ def _app_base_url() -> str:
     return PUBLIC_APP_URL
 
 
+def _render_workspace_members(wid: str) -> None:
+    """展示协作空间成员人数与昵称。"""
+    name = (st.session_state.get("member_name") or "").strip()
+    member_id = st.session_state.get("member_id") or ""
+    if name:
+        members = upsert_workspace_member(wid, member_id, name)
+    else:
+        members = list_workspace_members(wid)
+
+    if not members:
+        st.caption("👥 暂无成员。请填写上方昵称，队友加入并填写昵称后会显示在此。")
+        return
+
+    online = count_online_members(members)
+    st.markdown(f"**👥 空间成员（{len(members)} 人 · {online} 人在线）**")
+    for m in members:
+        label = html.escape(m.get("name") or "未命名")
+        activity = member_activity_label(float(m.get("last_seen") or 0))
+        suffix = ""
+        if m.get("id") == member_id:
+            suffix = " · **你**"
+        st.markdown(f"- {label}{suffix} · _{activity}_", unsafe_allow_html=True)
+
+
 def render_workspace_panel():
     """协作空间：邀请码创建 / 加入，共享会话与资料。"""
     if not ENABLE_WORKSPACE:
@@ -563,14 +594,15 @@ def render_workspace_panel():
     wid = st.session_state.get("workspace_id")
 
     st.session_state.member_name = st.text_input(
-        "你的昵称（可选）",
+        "你的昵称",
         value=st.session_state.member_name,
-        placeholder="例如：小明",
+        placeholder="例如：小明（加入后对其他成员可见）",
         key="member_name_input",
     )
 
     if wid:
         st.success(f"已加入：**{st.session_state.workspace_name or wid}**")
+        _render_workspace_members(wid)
         st.markdown(f"邀请码：`{wid}`")
         base = _app_base_url()
         if base:
@@ -584,6 +616,12 @@ def render_workspace_panel():
         with c1:
             if st.button("🔄 同步消息", use_container_width=True):
                 sync_workspace_messages(force=True)
+                if (st.session_state.get("member_name") or "").strip():
+                    upsert_workspace_member(
+                        wid,
+                        st.session_state.member_id,
+                        st.session_state.member_name,
+                    )
                 st.rerun()
         with c2:
             if st.button("退出空间", use_container_width=True):

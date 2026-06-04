@@ -8,18 +8,18 @@
 
 ## 一、准备 GitHub 仓库
 
-在项目目录 `course-agent` 下执行（需已安装 [Git](https://git-scm.com/) 并登录 GitHub）：
+在项目根目录 `course-agent` 下执行（需已安装 [Git](https://git-scm.com/) 并登录 GitHub）：
 
-```powershell
-cd "d:\HuaweiMoveData\Users\Wyonn\Desktop\算法实践大作业\course-agent"
+```bash
+cd course-agent
 
 git init
 git add .
 git commit -m "准备 Streamlit Cloud 部署"
 
-# 在 GitHub 网页新建空仓库（如 course-trace），不要勾选 README
+# 在 GitHub 网页新建空仓库，不要勾选 README
 git branch -M main
-git remote add origin https://github.com/你的用户名/course-trace.git
+git remote add origin https://github.com/<你的用户名>/<仓库名>.git
 git push -u origin main
 ```
 
@@ -113,4 +113,4 @@ PUBLIC_APP_URL = "https://course-trace.streamlit.app"
 streamlit run app.py --server.address 0.0.0.0
 ```
 
-把 `http://你的电脑IP:8501/?space=邀请码` 发给同网队友（你的电脑需一直开着且防火墙放行 8501）。
+将 `http://<主机局域网IP>:8501/?space=<邀请码>` 发给同网队友（主机需保持运行并放行 8501 端口）。

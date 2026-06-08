@@ -163,6 +163,20 @@ course-agent/
 
 ---
 
+## 小组协作文档
+
+| 目录 | 说明 |
+|------|------|
+| [docs/TASKS.md](./docs/TASKS.md) | 成员 B/C 任务说明与群公告模板 |
+| [docs/report.md](./docs/report.md) | 课程报告模板（B 填写） |
+| [docs/architecture.md](./docs/architecture.md) | 系统架构图与说明（B 填写） |
+| [docs/demo-script.md](./docs/demo-script.md) | 答辩演示脚本（B 准备） |
+| [eval/test_cases.md](./eval/test_cases.md) | 测试问题集（C 填写，≥20 题） |
+| [eval/results.md](./eval/results.md) | 评测结果与截图（C 填写） |
+| [eval/collab_test.md](./eval/collab_test.md) | 协作空间联调记录（B+C） |
+
+---
+
 ## 相关链接
 
 - **仓库**：https://github.com/wyonna111/course-agent  

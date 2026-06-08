@@ -419,14 +419,14 @@ def render_correction_form(doc, form_prefix: str, frag_idx: int) -> None:
             st.caption("当前显示的是**已纠错**版本；可继续修改下方内容。")
         with st.form(f"corr_form_{form_prefix}_{frag_idx}"):
             corrected = st.text_area(
-                "正确内容（将替代该页原文参与检索与作答）",
+                "正确内容",
                 value=existing["text"] if existing else raw[:2000],
                 height=140,
             )
             note = st.text_input(
-                "纠错说明（可选）",
+                "说明",
                 value=(existing or {}).get("note", ""),
-                placeholder="例如：课件印刷错误，应为…",
+                placeholder="例如：课件印刷错误",
             )
             if st.form_submit_button("保存纠错", use_container_width=True):
                 try:
@@ -482,10 +482,10 @@ def render_sources(
 ):
     if source_previews:
         with st.expander(
-            f"📎 课内参考资料（{len(source_previews)} 页 · 完整正文）",
+            f"📎 课内参考资料 · {len(source_previews)} 页",
             expanded=True,
         ):
-            st.caption("以下为当时送入模型的整页课件内容（已保存于对话记录）。")
+            st.caption("送入模型的整页课件内容。")
             for i, sp in enumerate(source_previews, 1):
                 st.markdown(
                     f"**{sp['location']}** · 本题相关度 **{sp.get('score_pct', 0)}%** · "
@@ -517,13 +517,10 @@ def render_sources(
         return
 
     with st.expander(
-        f"📎 课内参考资料（{len(docs_with_scores)} 页 · 完整正文）",
+        f"📎 课内参考资料 · {len(docs_with_scores)} 页",
         expanded=True,
     ):
-        st.caption(
-            "优先使用你上传的讲义/PPT；以下为送入模型的**整页**内容，"
-            "相关度由检索 + 语义重排得出。"
-        )
+        st.caption("送入模型的整页课件，相关度由检索与语义重排得出。")
         for i, (doc, score) in enumerate(docs_with_scores, 1):
             loc = location_label(doc.metadata)
             meta = (rerank_metas[i - 1] if rerank_metas and i <= len(rerank_metas) else {})
@@ -575,11 +572,11 @@ def _render_workspace_members(wid: str) -> None:
         members = list_workspace_members(wid)
 
     if not members:
-        st.caption("👥 暂无成员。请填写上方昵称，队友加入并填写昵称后会显示在此。")
+        st.caption("填写昵称后，队友加入时会显示在此。")
         return
 
     online = count_online_members(members)
-    st.markdown(f"**👥 空间成员（{len(members)} 人 · {online} 人在线）**")
+    st.markdown(f"**👥 成员 {len(members)} 人 · 在线 {online}**")
     for m in members:
         label = html.escape(m.get("name") or "未命名")
         activity = member_activity_label(float(m.get("last_seen") or 0))
@@ -592,7 +589,7 @@ def _render_workspace_members(wid: str) -> None:
 def render_workspace_panel():
     """协作空间：邀请码创建 / 加入，共享会话与资料。"""
     if not ENABLE_WORKSPACE:
-        st.info("协作空间未开启（.env ENABLE_WORKSPACE=true）")
+        st.info("协作空间未开启，请在环境变量中设置 ENABLE_WORKSPACE=true")
         return
 
     wid = st.session_state.get("workspace_id")
@@ -600,25 +597,23 @@ def render_workspace_panel():
     st.session_state.member_name = st.text_input(
         "你的昵称",
         value=st.session_state.member_name,
-        placeholder="例如：小明（加入后对其他成员可见）",
+        placeholder="例如：小明",
         key="member_name_input",
     )
 
     if wid:
-        st.success(f"已加入：**{st.session_state.workspace_name or wid}**")
+        st.success(f"已加入 · {st.session_state.workspace_name or wid}")
         _render_workspace_members(wid)
         st.markdown(f"邀请码：`{wid}`")
         base = _app_base_url()
         if base:
             share = f"{base}/?space={wid}"
-            st.markdown(f"**分享给队友：** [{share}]({share})")
-            st.caption("队友用浏览器打开上方链接即可，无需安装代码。")
+            st.markdown(f"分享链接：[{share}]({share})")
         else:
-            st.caption("把邀请码发给队友；公网部署后会自动显示完整分享链接。")
-            st.caption(f"链接格式：`你的网址/?space={wid}`")
+            st.caption(f"分享格式：`你的网址/?space={wid}`")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("🔄 同步消息", use_container_width=True):
+            if st.button("同步消息", use_container_width=True):
                 sync_workspace_messages(force=True)
                 if (st.session_state.get("member_name") or "").strip():
                     upsert_workspace_member(
@@ -636,18 +631,19 @@ def render_workspace_panel():
                 st.rerun()
         return
 
-    tab_create, tab_join = st.tabs(["创建空间", "加入空间"])
+    st.caption("与队友共享资料与对话，一人创建、其他人用邀请码加入。")
+    tab_create, tab_join = st.tabs(["创建", "加入"])
     with tab_create:
-        ws_name = st.text_input("空间名称", placeholder="例如：嵌入式期中复习", key="ws_create_name")
-        if st.button("创建并获取邀请码", type="primary", use_container_width=True):
+        ws_name = st.text_input("空间名称", placeholder="嵌入式期中复习", key="ws_create_name")
+        if st.button("创建协作空间", type="primary", use_container_width=True):
             meta = create_workspace(ws_name or "复习小组")
             enter_workspace(meta["id"], meta.get("name", ""))
             rebuild_index_for_context(st.session_state.doc_index)
             st.query_params["space"] = meta["id"]
             st.rerun()
     with tab_join:
-        code = st.text_input("输入邀请码", placeholder="6 位，如 A3K9M2", key="ws_join_code")
-        if st.button("加入空间", use_container_width=True):
+        code = st.text_input("邀请码", placeholder="6 位，如 A3K9M2", key="ws_join_code")
+        if st.button("加入协作空间", use_container_width=True):
             try:
                 meta = join_workspace(code)
                 enter_workspace(meta["id"], meta.get("name", ""))
@@ -659,7 +655,7 @@ def render_workspace_panel():
 
 
 def render_left_panel(index: DocumentIndex):
-    tab_data, tab_ws, tab_more = st.tabs(["📁 资料库", "👥 协作", "⚙️ 更多"])
+    tab_data, tab_ws, tab_more = st.tabs(["📁 资料库", "👥 协作空间", "⚙️ 更多"])
 
     with tab_data:
         _render_data_tab(index)
@@ -676,16 +672,7 @@ def render_left_panel(index: DocumentIndex):
             if not st.session_state.get("workspace_id"):
                 clear_personal_messages()
             st.rerun()
-        st.caption(
-            f"联网搜索：{'已开启' if ENABLE_WEB_SEARCH else '已关闭（.env ENABLE_WEB_SEARCH=true）'}"
-        )
-        with st.expander("✅ 功能一览"):
-            st.markdown(
-                "- ~~联网补充~~ ✅\n"
-                "- ~~协作空间~~ ✅\n"
-                "- ~~人工纠错~~ ✅\n"
-                "- ~~论文参考文献 / DOI~~ ✅"
-            )
+        st.caption(f"联网搜索：{'已开启' if ENABLE_WEB_SEARCH else '已关闭'}")
 
 
 def _render_data_tab(index: DocumentIndex):
@@ -702,9 +689,9 @@ def _render_data_tab(index: DocumentIndex):
         return
 
     if in_ws:
-        st.caption("协作空间**共享**资料，队友上传的文件所有人可检索。")
+        st.caption("当前为协作空间，资料全员共享。")
     else:
-        st.caption("支持 PDF、PPTX、TXT/MD；可多次上传，自动合并索引。")
+        st.caption("支持 PDF、PPTX、TXT、MD，可多次上传。")
 
     uploaded = st.file_uploader(
         "上传课程资料",
@@ -749,7 +736,7 @@ def _render_data_tab(index: DocumentIndex):
                 f"共 {index.retriever.stats['file_count']} 个文件 · "
                 f"{index.retriever.stats['total_chunks']} 个片段"
             )
-            with st.expander("🔍 检索调试（可选）"):
+            with st.expander("🔍 检索调试"):
                 test_q = st.text_input("试一句检索", placeholder="例如：UART 是什么")
                 if st.button("测试检索", use_container_width=True) and test_q.strip():
                     dbg = index.retriever.debug_search(test_q.strip())
@@ -804,9 +791,7 @@ def _execute_index_job(index: DocumentIndex, data_dir: Path) -> None:
         st.warning(err)
     if results:
         total = index.retriever.stats["total_chunks"] if index.retriever else 0
-        st.success(
-            f"已索引 {len(results)} 个文件，共 {total} 个片段（对话记录已保留）"
-        )
+        st.success(f"已索引 {len(results)} 个文件，共 {total} 个片段")
     st.rerun()
 
 
@@ -820,9 +805,7 @@ def _execute_rebuild_job(index: DocumentIndex, data_dir: Path, in_ws: bool) -> N
                 label=f"重建完成：{info['rebuilt_files']} 个文件",
                 state="complete",
             )
-        st.success(
-            f"已重建 {info['rebuilt_files']} 个文件（对话记录已保留）"
-        )
+        st.success(f"已重建 {info['rebuilt_files']} 个文件")
     except Exception as e:
         st.error(str(e))
     finally:
@@ -854,11 +837,8 @@ def render_references_panel():
     rows_all = st.session_state.get("parsed_references") or []
     upload_key = int(st.session_state.get("ref_upload_key", 0))
 
-    with st.expander("📚 论文 DOI 工具（可选，与课内问答无关）", expanded=bool(rows_all or pending)):
-        st.caption(
-            "仅用于解析文末 References 里的 DOI 链接。"
-            "**日常提问请用右侧对话**，系统会优先检索你上传的讲义/PPT。"
-        )
+    with st.expander("📚 论文 DOI 工具", expanded=bool(rows_all or pending)):
+        st.caption("解析文末 References 中的 DOI；日常提问请用右侧对话。")
 
         if rows_all or pending:
             c_clear, _ = st.columns([1, 2])
@@ -907,12 +887,12 @@ def render_references_panel():
             disabled=busy,
         )
         fetch_meta = st.checkbox(
-            "联网：CrossRef 补全标题 / 无 DOI 时尝试书目检索（需联网）",
+            "联网补全标题与书目",
             value=REFERENCE_FETCH_META,
             key="ref_fetch_meta",
         )
         hide_table = st.checkbox(
-            "隐藏「表格行」（MOF 对比表等，本身不是文献）",
+            "隐藏表格行",
             value=True,
             key="ref_hide_table",
         )
@@ -1041,9 +1021,9 @@ def render_corrections_panel():
     wid = current_workspace_id()
     items = list_corrections_summary(wid)
     scope = "协作空间" if wid else "个人"
-    with st.expander(f"✏️ 纠错记录 · {scope}（{len(items)}）", expanded=False):
+    with st.expander(f"✏️ 纠错记录 · {scope} · {len(items)} 条", expanded=False):
         if not items:
-            st.caption("在右侧回答的「资料片段」下可提交纠错；保存后全员/后续问答生效。")
+            st.caption("在右侧回答的资料片段下可提交纠错。")
             return
         for i, item in enumerate(items):
             st.markdown(f"**{item['source_name']}** · {item['page_label']}")
@@ -1078,23 +1058,18 @@ def _render_assistant_message(msg: dict, idx: int) -> None:
         mode = meta.get("source_mode")
         if mode == "web":
             st.caption(
-                f"📌 上传资料未覆盖（本地相关度 {meta.get('best_sim', 0):.3f}），"
-                f"已联网检索 {meta.get('web_count', 0)} 条。"
+                f"📌 资料未覆盖，已联网检索 {meta.get('web_count', 0)} 条"
             )
         elif mode == "hybrid":
-            st.caption(
-                f"📌 本地 + 网络综合回答（本地相关度 {meta.get('best_sim', 0):.3f}）。"
-            )
+            st.caption("📌 综合课内资料与网络来源")
         elif mode == "local":
             pct = int(round(meta.get("best_sim", 0) * 100))
             prompt_hint = st.session_state.messages[idx - 1]["content"] if idx > 0 else ""
             amode = detect_answer_mode(prompt_hint)
             cap = amode.ui_caption.format(pct=pct)
             if amode.id == "direct" and meta.get("topic_strong"):
-                cap += f"，概念覆盖 {meta.get('coverage', 0):.0%}"
-            if amode.id == "direct":
-                cap += "）"
-            st.caption(f"{cap} · 题型：{amode.label}")
+                cap += f" · 概念覆盖 {meta.get('coverage', 0):.0%}"
+            st.caption(f"{cap} · {amode.label}")
 
         if msg.get("sources"):
             render_sources(
@@ -1115,12 +1090,12 @@ def _render_assistant_message(msg: dict, idx: int) -> None:
 def render_chat_messages(index: DocumentIndex) -> None:
     sync_workspace_messages()
 
-    web_hint = "资料不足自动联网" if ENABLE_WEB_SEARCH else "未开启联网"
+    web_hint = "资料不足时联网" if ENABLE_WEB_SEARCH else "仅课内资料"
     st.markdown(
         f"""
         <div class="ct-chat-header">
           <p class="ct-chat-title">💬 对话</p>
-          <p class="ct-chat-sub">TF-IDF + DeepSeek · {html.escape(web_hint)}</p>
+          <p class="ct-chat-sub">{html.escape(web_hint)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1147,11 +1122,11 @@ def render_chat_messages(index: DocumentIndex) -> None:
 
     if not msgs:
         if index.ready:
-            hint = "在下方输入问题开始对话。滚动长回答时，题目会悬浮在顶部方便对照。"
+            hint = "在下方输入问题开始对话。"
         elif ENABLE_WEB_SEARCH:
-            hint = "尚未索引本地资料，可直接提问（将尝试联网回答）。"
+            hint = "尚未上传资料，可直接提问，将尝试联网回答。"
         else:
-            hint = "请先在左侧「资料库」上传讲义/PPT 并点击「解析并加入索引」。"
+            hint = "请先在左侧上传资料并建立索引。"
         st.markdown(f'<div class="ct-empty-hint">{html.escape(hint)}</div>', unsafe_allow_html=True)
 
     if st.session_state.get("qa_job_active"):
@@ -1223,7 +1198,7 @@ def process_chat_input(index: DocumentIndex, llm) -> None:
     if busy:
         placeholder = "资料正在处理中，请稍候再提问…"
     elif index.ready or ENABLE_WEB_SEARCH:
-        placeholder = "输入问题，Enter 发送（多轮对话）"
+        placeholder = "输入问题，Enter 发送"
     else:
         placeholder = "请先在左侧「资料库」上传并索引资料…"
     prompt = st.chat_input(placeholder, disabled=not can_chat)
@@ -1239,8 +1214,13 @@ def process_chat_input(index: DocumentIndex, llm) -> None:
     st.rerun()
 
 
-def _scroll_panel():
-    """固定高度可滚动面板（Streamlit ≥1.33 支持 height 参数）。"""
+def _left_panel():
+    """左栏随内容增高，不强制固定高度滚动区。"""
+    return st.container(border=False)
+
+
+def _chat_panel():
+    """右栏对话区：固定视口高度，由 CSS 控制实际滚动。"""
     try:
         return st.container(height=UI_PANEL_HEIGHT, border=False)
     except TypeError:
@@ -1271,10 +1251,10 @@ def main():
 
     left, right = st.columns([22, 78], gap="small")
     with left:
-        with _scroll_panel():
+        with _left_panel():
             render_left_panel(index)
     with right:
-        with _scroll_panel():
+        with _chat_panel():
             render_chat_messages(index)
 
     process_chat_input(index, llm)

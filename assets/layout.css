@@ -1,4 +1,4 @@
-/* 课内有据 — 左/右独立滚动（配合 st.container(height=…)） */
+/* 课内有据 — 仅右侧对话区滚动；左侧随内容高度，超出视口才滚动 */
 
 :root {
   --ct-primary: #4f7df3;
@@ -22,6 +22,12 @@
 
 .stApp {
   background: var(--ct-slate-50);
+  overflow: hidden !important;
+}
+
+html,
+body {
+  overflow: hidden !important;
 }
 
 .stApp .main .block-container,
@@ -31,6 +37,11 @@
   padding-left: var(--ct-page-x) !important;
   padding-right: var(--ct-page-x) !important;
   max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+section.main {
+  overflow: hidden !important;
 }
 
 section.main > div {
@@ -156,23 +167,32 @@ section.main div[data-testid="stHorizontalBlock"].ct-layout-row > div[data-testi
   padding: 0.25rem 0 0.25rem 0.35rem !important;
 }
 
-/* Streamlit 固定高度容器：必须可滚动 */
-section.main div[data-testid="column"] [data-testid="stVerticalBlockBorderWrapper"] {
+/* 左栏：随内容增高，文件少时不出现滚动条；内容过多时在本栏内滚动 */
+section.main div[data-testid="column"]:first-child {
+  max-height: calc(100vh - var(--ct-content-top) - 0.5rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+/* 右栏：固定视口高度，仅对话区滚动 */
+section.main div[data-testid="column"]:last-child [data-testid="stVerticalBlockBorderWrapper"] {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
+  height: calc(100vh - var(--ct-content-top) - var(--ct-chat-input-h) - 0.75rem) !important;
+  max-height: calc(100vh - var(--ct-content-top) - var(--ct-chat-input-h) - 0.75rem) !important;
   border: 1px solid var(--ct-border) !important;
   border-radius: var(--ct-radius) !important;
   background: #ffffff !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
-section.main div[data-testid="column"]:first-child [data-testid="stVerticalBlockBorderWrapper"] {
-  background: #ffffff !important;
-}
-
-section.main div[data-testid="column"]:last-child [data-testid="stVerticalBlockBorderWrapper"],
 section.main div[data-testid="column"]:last-child .ct-chat-scroll-root {
   background: #ffffff !important;
 }
@@ -307,7 +327,8 @@ div[data-testid="stChatInput"] > div {
 }
 
 @media (prefers-color-scheme: dark) {
-  section.main div[data-testid="column"] [data-testid="stVerticalBlockBorderWrapper"] {
+  section.main div[data-testid="column"]:first-child,
+  section.main div[data-testid="column"]:last-child [data-testid="stVerticalBlockBorderWrapper"] {
     background: var(--secondary-background-color) !important;
   }
 

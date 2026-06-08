@@ -130,10 +130,7 @@ ANSWER_MODES: tuple[AnswerModeProfile, ...] = (
         max_cite=3,
         skip_web_if_strong=True,
         prompt_id="concept_apply",
-        ui_caption=(
-            "📐 **概念应用题**：按课件规则/例题演算；"
-            "引用为**规则或同类例题依据**（非题目原句）。规则匹配度最高 {pct}%。"
-        ),
+        ui_caption="📐 概念应用 · 规则匹配度 {pct}%",
         chunk_hint="📐 概念应用：此页提供规则或同类例题，非现成答案。",
         rerank_hint=(
             "概念应用题：资料含同类定义、换算规则、公式或例题即可高分，"
@@ -152,7 +149,7 @@ ANSWER_MODES: tuple[AnswerModeProfile, ...] = (
         max_cite=2,
         skip_web_if_strong=True,
         prompt_id="page_lookup",
-        ui_caption="📄 **按页码定位**：已直接读取指定页内容。匹配度 {pct}%。",
+        ui_caption="📄 页码定位 · 匹配度 {pct}%",
         chunk_hint="",
         rerank_hint="按页码定位，无需语义重排。",
     ),
@@ -168,7 +165,7 @@ ANSWER_MODES: tuple[AnswerModeProfile, ...] = (
         max_cite=None,
         skip_web_if_strong=True,
         prompt_id="compare",
-        ui_caption="⚖️ **对比题**：引用为对比依据页。最高相关度 {pct}%。",
+        ui_caption="⚖️ 对比分析 · 相关度 {pct}%",
         chunk_hint="⚖️ 对比题：此页提供一方或对比维度的概念依据。",
         rerank_hint="对比题：含任一方定义、特点或对比维度即可给中等以上分数。",
     ),
@@ -184,7 +181,7 @@ ANSWER_MODES: tuple[AnswerModeProfile, ...] = (
         max_cite=None,
         skip_web_if_strong=True,
         prompt_id="reasoning",
-        ui_caption="🧩 **推理题**：需据资料定义推导结论。最高相关度 {pct}%。",
+        ui_caption="🧩 概念推理 · 相关度 {pct}%",
         chunk_hint="🧩 推理题：此页提供定义或规则，需结合题目推理。",
         rerank_hint="推理题：含相关定义/规则即可高分，不要求资料写出最终结论。",
     ),
@@ -200,7 +197,7 @@ ANSWER_MODES: tuple[AnswerModeProfile, ...] = (
         max_cite=None,
         skip_web_if_strong=False,
         prompt_id="local",
-        ui_caption="📌 基于上传资料（最高相关度 {pct}%",
+        ui_caption="📌 课内资料 · 相关度 {pct}%",
         chunk_hint="",
         rerank_hint="直接检索：资料需与问题主题直接相关。",
     ),

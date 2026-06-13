@@ -44,9 +44,21 @@ def load_corrections(workspace_id: str | None = None) -> dict[str, dict]:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+    # 兼容旧格式：单条 dict；新格式：{source_key: {active, history: [...]}}
+    normalized: dict[str, dict] = {}
+    for key, value in data.items():
+        if isinstance(value, dict) and "history" in value:
+            normalized[key] = value
+        elif isinstance(value, dict):
+            normalized[key] = {
+                "active": value,
+                "history": [value],
+            }
+    return normalized
 
 
 def _save_all(data: dict[str, dict], workspace_id: str | None = None) -> None:
@@ -72,7 +84,7 @@ def save_correction(
     if not text:
         raise CorrectionError("纠错正文不能为空")
     data = load_corrections(workspace_id)
-    data[source_key] = {
+    entry = {
         "text": text,
         "note": note.strip(),
         "source_name": source_name,
@@ -81,8 +93,12 @@ def save_correction(
         "author": author.strip(),
         "updated_at": time.time(),
     }
+    record = data.get(source_key, {"history": []})
+    history = record.get("history", [])
+    history.append(entry)
+    data[source_key] = {"active": entry, "history": history}
     _save_all(data, workspace_id)
-    return data[source_key]
+    return entry
 
 
 def delete_correction(source_key: str, workspace_id: str | None = None) -> bool:
@@ -95,24 +111,32 @@ def delete_correction(source_key: str, workspace_id: str | None = None) -> bool:
 
 
 def get_correction(source_key: str, workspace_id: str | None = None) -> dict | None:
-    return load_corrections(workspace_id).get(source_key)
+    record = load_corrections(workspace_id).get(source_key)
+    if not record:
+        return None
+    if isinstance(record, dict) and "active" in record:
+        return record.get("active")
+    return record
 
 
 def apply_correction_to_doc(
     doc: Document, workspace_id: str | None = None
 ) -> Document:
-    """若该页有纠错，返回带纠错正文的副本；否则原样返回。"""
+    """若该页有纠错，返回带纠错正文的副本；否则原样返回。
+
+    兼容同一页被多次纠错：始终保留原始正文，最新纠错内容覆盖展示。
+    """
     if not ENABLE_CORRECTIONS:
         return doc
     key = chunk_source_key(doc.metadata)
     corr = get_correction(key, workspace_id)
     if not corr:
         return doc
-    if doc.metadata.get("corrected"):
-        return doc
 
     meta = deepcopy(doc.metadata)
+    original_raw = meta.get("original_raw_content") or meta.get("raw_content") or doc.page_content
     meta["corrected"] = True
+    meta["original_raw_content"] = original_raw
     meta["correction_note"] = corr.get("note", "")
     meta["correction_author"] = corr.get("author", "")
     raw = corr["text"]
@@ -138,16 +162,19 @@ def apply_corrections_to_docs(
 def list_corrections_summary(workspace_id: str | None = None) -> list[dict[str, Any]]:
     data = load_corrections(workspace_id)
     items = []
-    for key, c in data.items():
+    for key, record in data.items():
+        active = record.get("active", record) if isinstance(record, dict) else record
+        history = record.get("history", []) if isinstance(record, dict) else []
         items.append(
             {
                 "key": key,
-                "source_name": c.get("source_name", key.split("::")[0]),
-                "page_label": c.get("page_label", ""),
-                "note": c.get("note", ""),
-                "author": c.get("author", ""),
-                "preview": c.get("text", "")[:80],
-                "updated_at": c.get("updated_at", 0),
+                "source_name": active.get("source_name", key.split("::")[0]),
+                "page_label": active.get("page_label", ""),
+                "note": active.get("note", ""),
+                "author": active.get("author", ""),
+                "preview": active.get("text", "")[:80],
+                "updated_at": active.get("updated_at", 0),
+                "history_count": len(history),
             }
         )
     items.sort(key=lambda x: x["updated_at"], reverse=True)

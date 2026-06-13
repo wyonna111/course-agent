@@ -320,6 +320,19 @@ def parse_references_from_text(
     return [resolve_reference_entry(e, fetch_meta=fetch_meta) for e in entries]
 
 
+def parse_references_from_upload(
+    text: str, *, fetch_meta: bool = True
+) -> list[dict[str, Any]]:
+    """兼容上传 Word/docx/doc 文档的解析入口。"""
+    return parse_references_from_text(text, fetch_meta=fetch_meta)
+
+
+def parse_references_from_doc(path: Path, *, fetch_meta: bool = True) -> list[dict[str, Any]]:
+    """直接从 .doc/.docx 路径解析，优先复用现有的富文本读取逻辑。"""
+    text = load_text_from_file(path)
+    return parse_references_from_text(text, fetch_meta=fetch_meta)
+
+
 def load_text_from_file(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
@@ -335,6 +348,14 @@ def load_text_from_file(path: Path) -> str:
 
             docs = PyPDFLoader(str(path)).load()
             return "\n".join(d.page_content for d in docs)
+    if suffix in {".doc", ".docx"}:
+        try:
+            from docx import Document as DocxDocument
+
+            doc = DocxDocument(str(path))
+            return "\n".join(p.text for p in doc.paragraphs)
+        except Exception:
+            return path.read_text(encoding="utf-8", errors="ignore")
     return path.read_text(encoding="utf-8", errors="ignore")
 
 

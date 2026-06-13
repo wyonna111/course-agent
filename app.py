@@ -61,8 +61,10 @@ from src.loaders import location_label
 from src.question_types import detect_answer_mode
 from src.references import (
     linkify_dois_in_text,
+    parse_references_from_doc,
     parse_references_from_file,
     parse_references_from_text,
+    parse_references_from_upload,
     summarize_parse_results,
 )
 from src.retriever import chunk_index_text
@@ -414,7 +416,7 @@ def render_correction_form(doc, form_prefix: str, frag_idx: int) -> None:
     raw = doc.metadata.get("raw_content") or chunk_index_text(doc)
     loc = location_label(doc.metadata)
 
-    with st.expander("✏️ 纠错此页课件", expanded=False):
+    with st.expander("✏️ 纠错此页课件", expanded=bool(existing)):
         if doc.metadata.get("corrected"):
             st.caption("当前显示的是**已纠错**版本；可继续修改下方内容。")
         with st.form(f"corr_form_{form_prefix}_{frag_idx}"):
@@ -422,11 +424,13 @@ def render_correction_form(doc, form_prefix: str, frag_idx: int) -> None:
                 "正确内容",
                 value=existing["text"] if existing else raw[:2000],
                 height=140,
+                key=f"corr_text_{form_prefix}_{frag_idx}",
             )
             note = st.text_input(
                 "说明",
                 value=(existing or {}).get("note", ""),
                 placeholder="例如：课件印刷错误",
+                key=f"corr_note_{form_prefix}_{frag_idx}",
             )
             if st.form_submit_button("保存纠错", use_container_width=True):
                 try:
@@ -435,7 +439,7 @@ def render_correction_form(doc, form_prefix: str, frag_idx: int) -> None:
                         corrected,
                         source_name=doc.metadata.get("source_name", ""),
                         page_label=loc,
-                        original_preview=raw,
+                        original_preview=doc.metadata.get("original_raw_content") or raw,
                         note=note,
                         author=st.session_state.get("member_name", ""),
                         workspace_id=wid,
@@ -654,16 +658,41 @@ def render_workspace_panel():
                 st.error(str(e))
 
 
+def _inject_tab_restore() -> None:
+    pass  # no longer needed — left panel uses st.radio which persists across reruns
+
+
 def render_left_panel(index: DocumentIndex):
-    tab_data, tab_ws, tab_more = st.tabs(["📁 资料库", "👥 协作空间", "⚙️ 更多"])
+    # 参考文献解析任务在面板渲染前执行，避免 rerun 后重置导航状态
+    if st.session_state.get("ref_job_active"):
+        _execute_ref_parse_job()
+        return
 
-    with tab_data:
+    PANELS = ["📁 资料库", "👥 协作空间", "⚙️ 更多"]
+    # 初始化
+    if "left_panel_radio" not in st.session_state:
+        st.session_state.left_panel_radio = PANELS[0]
+    # 任务完成后切换到目标面板（直接写 key 值，radio 会自动反映）
+    target = st.session_state.pop("_left_tab_target", None)
+    if target:
+        for p in PANELS:
+            if target in p:
+                st.session_state.left_panel_radio = p
+                break
+
+    selected = st.radio(
+        "面板",
+        PANELS,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="left_panel_radio",
+    )
+
+    if selected == PANELS[0]:
         _render_data_tab(index)
-
-    with tab_ws:
+    elif selected == PANELS[1]:
         render_workspace_panel()
-
-    with tab_more:
+    else:
         render_references_panel()
         render_corrections_panel()
         if st.button("清空对话", use_container_width=True, key="clear_chat_btn"):
@@ -828,10 +857,6 @@ def render_references_panel():
     if not ENABLE_REFERENCES:
         return
 
-    if st.session_state.get("ref_job_active"):
-        _execute_ref_parse_job()
-        return
-
     busy = is_app_busy()
     pending = st.session_state.get("ref_job_pending")
     rows_all = st.session_state.get("parsed_references") or []
@@ -849,6 +874,7 @@ def render_references_panel():
                     key="ref_clear_btn",
                 ):
                     _clear_references_state()
+                    st.session_state._left_tab_target = "更多"
                     st.rerun()
 
         if pending:
@@ -864,21 +890,27 @@ def render_references_panel():
                     }
                     st.session_state.ref_job_active = True
                     st.session_state.pop("ref_job_pending", None)
+                    st.session_state._left_tab_target = "更多"
                     st.rerun()
             with c_no:
                 if st.button("取消", use_container_width=True, key="ref_cancel_pending_btn"):
                     st.session_state.pop("ref_job_pending", None)
+                    st.session_state._left_tab_target = "更多"
                     st.rerun()
             st.caption("文件选错了？点 **取消** 或 **清空并重新上传**。")
             return
 
         ref_file = st.file_uploader(
-            "参考文献 PDF/TXT",
-            type=["pdf", "txt", "md"],
+            "参考文献 PDF/TXT/DOC",
+            type=["pdf", "txt", "md", "doc", "docx"],
             key=f"ref_bib_upload_{upload_key}",
             label_visibility="collapsed",
             disabled=busy,
         )
+        upload_notice = None
+        if ref_file is not None:
+            upload_notice = f"已选择：{ref_file.name}"
+            st.caption(upload_notice)
         ref_text = st.text_area(
             "或直接粘贴参考文献文本",
             height=120,
@@ -906,16 +938,23 @@ def render_references_panel():
             if ref_file is None and not ref_text.strip():
                 st.warning("请上传文件或粘贴参考文献文本")
             else:
-                job: dict = {"fetch_meta": fetch_meta}
                 if ref_file is not None:
-                    job["file"] = {"name": ref_file.name, "data": ref_file.getvalue()}
-                    job["label"] = ref_file.name
+                    job: dict = {
+                        "fetch_meta": fetch_meta,
+                        "file": {"name": ref_file.name, "data": ref_file.getvalue()},
+                        "label": ref_file.name,
+                    }
+                    st.session_state.ref_job_payload = job
+                    st.session_state.ref_job_active = True
+                    st.session_state._left_tab_target = "更多"
+                    st.rerun()
                 else:
-                    job["text"] = ref_text
+                    job = {"fetch_meta": fetch_meta, "text": ref_text}
                     preview = ref_text.strip().splitlines()[0][:40]
                     job["label"] = preview + ("…" if len(ref_text.strip()) > 40 else "")
-                st.session_state.ref_job_pending = job
-                st.rerun()
+                    st.session_state.ref_job_pending = job
+                    st.session_state._left_tab_target = "更多"
+                    st.rerun()
 
         rows = list(rows_all)
         if hide_table:
@@ -928,45 +967,46 @@ def render_references_panel():
         st.caption(
             f"共 {len(rows)} 条 · 解析错了可点上方 **清空并重新上传** 换文件。"
         )
-        for i, row in enumerate(rows, 1):
-            preview = row.get("preview") or row.get("entry", "")
-            title = row.get("title") or ""
-            year = row.get("year")
-            doi = row.get("doi")
-            url = row.get("url", "")
-            status = row.get("status") or ""
-            entry_type = row.get("entry_type", "")
+        with st.container(height=min(600, max(300, len(rows) * 90))):
+            for i, row in enumerate(rows, 1):
+                preview = row.get("preview") or row.get("entry", "")
+                title = row.get("title") or ""
+                year = row.get("year")
+                doi = row.get("doi")
+                url = row.get("url", "")
+                status = row.get("status") or ""
+                entry_type = row.get("entry_type", "")
 
-            head = f"**[{i}]** "
-            if title:
-                meta = title
-                if year:
-                    meta += f" ({year})"
-                head += meta
-            else:
-                head += preview[:120] + ("…" if len(preview) > 120 else "")
+                head = f"**[{i}]** "
+                if title:
+                    meta = title
+                    if year:
+                        meta += f" ({year})"
+                    head += meta
+                else:
+                    head += preview[:120] + ("…" if len(preview) > 120 else "")
 
-            if doi and url:
-                src = row.get("source", "")
-                hint = "检索匹配" if src == "crossref_search" else "DOI"
-                head += f" · [{hint}]({url})"
-            elif entry_type == "table_row":
-                head += " · _表格行（非文献）_"
-            else:
-                head += " · _无 DOI_"
+                if doi and url:
+                    src = row.get("source", "")
+                    hint = "检索匹配" if src == "crossref_search" else "DOI"
+                    head += f" · [{hint}]({url})"
+                elif entry_type == "table_row":
+                    head += " · _表格行（非文献）_"
+                else:
+                    head += " · _无 DOI_"
 
-            st.markdown(head)
-            if status:
-                st.caption(status)
-            if title and preview:
-                st.caption(preview[:200] + ("…" if len(preview) > 200 else ""))
-            authors = row.get("authors") or []
-            if authors:
-                st.caption("作者：" + "；".join(authors[:4]))
-            score = row.get("crossref_score")
-            if score is not None and doi:
-                st.caption(f"CrossRef 匹配度：{score:.1f}")
-            st.divider()
+                st.markdown(head)
+                if status:
+                    st.caption(status)
+                if title and preview:
+                    st.caption(preview[:200] + ("…" if len(preview) > 200 else ""))
+                authors = row.get("authors") or []
+                if authors:
+                    st.caption("作者：" + "；".join(authors[:4]))
+                score = row.get("crossref_score")
+                if score is not None and doi:
+                    st.caption(f"CrossRef 匹配度：{score:.1f}")
+                st.divider()
 
 
 def _execute_ref_parse_job() -> None:
@@ -983,7 +1023,11 @@ def _execute_ref_parse_job() -> None:
                 tmp.write_bytes(f["data"])
                 if fetch_meta:
                     status.write("正在识别 DOI，并联网查询 CrossRef…")
-                rows = parse_references_from_file(tmp, fetch_meta=fetch_meta)
+                suffix = Path(f["name"]).suffix.lower()
+                if suffix in {".doc", ".docx"}:
+                    rows = parse_references_from_doc(tmp, fetch_meta=fetch_meta)
+                else:
+                    rows = parse_references_from_file(tmp, fetch_meta=fetch_meta)
             elif job.get("text"):
                 status.write("正在解析粘贴的文本…")
                 if fetch_meta:
@@ -1012,6 +1056,7 @@ def _execute_ref_parse_job() -> None:
             f"共 {stats['total']} 条 · {stats['with_doi']} 条有 DOI · "
             f"{stats['table_rows']} 条疑似表格行 · {stats['citations']} 条像文献"
         )
+    st.session_state._left_tab_target = "更多"
     st.rerun()
 
 
@@ -1022,18 +1067,54 @@ def render_corrections_panel():
     items = list_corrections_summary(wid)
     scope = "协作空间" if wid else "个人"
     with st.expander(f"✏️ 纠错记录 · {scope} · {len(items)} 条", expanded=False):
+        st.caption("提交纠错：右侧提问后，在回答下方「📎 课内参考资料」→「✏️ 纠错此页课件」中操作。")
         if not items:
-            st.caption("在右侧回答的资料片段下可提交纠错。")
             return
+        from src.corrections import load_corrections
+        all_corr = load_corrections(wid)
         for i, item in enumerate(items):
             st.markdown(f"**{item['source_name']}** · {item['page_label']}")
             if item.get("author"):
                 st.caption(f"提交：{item['author']}")
             if item.get("note"):
                 st.caption(f"说明：{item['note']}")
+            if item.get("history_count", 0) > 1:
+                st.caption(f"已更新 {item['history_count']} 次")
+            full_text = (all_corr.get(item["key"], {}).get("active") or {}).get("text", item.get("preview", ""))
             st.text(item["preview"] + ("…" if len(item["preview"]) >= 80 else ""))
+            with st.form(key=f"panel_edit_corr_{i}_{item['key']}"):
+                new_text = st.text_area(
+                    "修改纠错内容",
+                    value=full_text,
+                    height=120,
+                    key=f"panel_corr_text_{i}",
+                    label_visibility="collapsed",
+                )
+                new_note = st.text_input(
+                    "说明",
+                    value=item.get("note", ""),
+                    placeholder="例如：课件印刷错误",
+                    key=f"panel_corr_note_{i}",
+                )
+                if st.form_submit_button("保存修改", use_container_width=True):
+                    try:
+                        save_correction(
+                            item["key"],
+                            new_text,
+                            source_name=item.get("source_name", ""),
+                            page_label=item.get("page_label", ""),
+                            note=new_note,
+                            author=st.session_state.get("member_name", ""),
+                            workspace_id=wid,
+                        )
+                        st.success("已保存")
+                        st.session_state._left_tab_target = "更多"
+                        st.rerun()
+                    except CorrectionError as e:
+                        st.error(str(e))
             if st.button("删除", key=f"panel_del_corr_{i}_{item['key']}", use_container_width=True):
                 delete_correction(item["key"], wid)
+                st.session_state._left_tab_target = "更多"
                 st.rerun()
             st.divider()
 

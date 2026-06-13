@@ -22,7 +22,6 @@
 
 .stApp {
   background: var(--ct-slate-50);
-  overflow: hidden !important;
 }
 
 html,
@@ -37,11 +36,11 @@ body {
   padding-left: var(--ct-page-x) !important;
   padding-right: var(--ct-page-x) !important;
   max-width: 100% !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 section.main {
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 section.main > div {
@@ -154,8 +153,6 @@ section.main div[data-testid="stHorizontalBlock"].ct-layout-row > div[data-testi
   width: var(--ct-sidebar-w) !important;
   min-width: 180px !important;
   max-width: 55vw !important;
-  position: sticky !important;
-  top: var(--ct-content-top) !important;
   align-self: flex-start !important;
   padding: 0.25rem 0.35rem 0.25rem 0 !important;
 }
@@ -167,9 +164,13 @@ section.main div[data-testid="stHorizontalBlock"].ct-layout-row > div[data-testi
   padding: 0.25rem 0 0.25rem 0.35rem !important;
 }
 
-/* 左栏：随内容增高，文件少时不出现滚动条；内容过多时在本栏内滚动 */
+/* 左栏：固定在视口左侧，高度撑满，内容超出时内部滚动 */
 section.main div[data-testid="column"]:first-child {
-  max-height: calc(100vh - var(--ct-content-top) - 0.5rem);
+  position: fixed !important;
+  top: var(--ct-content-top) !important;
+  left: var(--ct-page-x) !important;
+  width: var(--ct-sidebar-w) !important;
+  height: calc(100vh - var(--ct-content-top) - 0.5rem) !important;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -177,6 +178,7 @@ section.main div[data-testid="column"]:first-child {
   border-radius: var(--ct-radius);
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  z-index: 10;
 }
 
 /* 右栏：固定视口高度，仅对话区滚动 */

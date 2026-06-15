@@ -7,3 +7,14 @@ data/
 __pycache__/
 *.pyc
 .DS_Store
+
+# 调试截图与日志
+sc_*.png
+sc_*.jpg
+sc_*.txt
+st.log
+st_out*.log
+streamlit_run.log
+
+# 参考文献上传缓存
+_ref_upload/

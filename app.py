@@ -1180,15 +1180,22 @@ def render_chat_messages(index: DocumentIndex) -> None:
     sync_workspace_messages()
 
     web_hint = "资料不足时联网" if ENABLE_WEB_SEARCH else "仅课内资料"
-    st.markdown(
-        f"""
-        <div class="ct-chat-header">
-          <p class="ct-chat-title">💬 对话</p>
-          <p class="ct-chat-sub">{html.escape(web_hint)}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    _col_title, _col_clear = st.columns([6, 1])
+    with _col_title:
+        st.markdown(
+            f"""
+            <div class="ct-chat-header">
+              <p class="ct-chat-title">💬 对话</p>
+              <p class="ct-chat-sub">{html.escape(web_hint)}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with _col_clear:
+        if st.button("🗑️", help="清空对话记录", key="clear_chat_header_btn", use_container_width=True):
+            st.session_state.messages = []
+            persist_messages()
+            st.rerun()
 
     msgs = st.session_state.messages
     i = 0

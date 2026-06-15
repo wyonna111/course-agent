@@ -202,7 +202,8 @@ def ensure_messages_loaded() -> None:
     if wid and ENABLE_WORKSPACE:
         st.session_state.messages = load_workspace_messages(wid)
     else:
-        st.session_state.messages = load_personal_messages()
+        # 个人模式不加载历史记录，每次进入都是全新会话
+        st.session_state.messages = []
     st.session_state._messages_loaded = True
 
 
@@ -211,11 +212,19 @@ def reset_messages_loaded_flag() -> None:
 
 
 def active_data_dir() -> Path:
-    """当前生效的资料目录：协作空间内用空间 data/，否则用全局 data/。"""
+    """当前生效的资料目录：协作空间内用空间 data/，否则用 session 级临时目录（不共享）。"""
     wid = st.session_state.get("workspace_id")
     if wid and ENABLE_WORKSPACE:
         return get_workspace_data_dir(wid)
-    return DATA_DIR
+    # 个人模式：每个 session 独立，用 session_id 隔离，避免显示其他人上传的文件
+    sid = st.session_state.get("_session_id")
+    if not sid:
+        import uuid as _uuid
+        sid = _uuid.uuid4().hex
+        st.session_state._session_id = sid
+    personal_dir = DATA_DIR / "personal" / sid
+    personal_dir.mkdir(parents=True, exist_ok=True)
+    return personal_dir
 
 
 def sync_workspace_messages(force: bool = False) -> bool:
@@ -235,8 +244,7 @@ def persist_messages() -> None:
     wid = st.session_state.get("workspace_id")
     if wid and ENABLE_WORKSPACE:
         save_workspace_messages(wid, st.session_state.messages)
-    else:
-        save_personal_messages(st.session_state.messages)
+    # 个人模式下不持久化，会话结束即清空
 
 
 def rebuild_index_for_context(index: DocumentIndex) -> None:

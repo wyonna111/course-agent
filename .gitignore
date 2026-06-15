@@ -4,6 +4,7 @@ venv/
 chroma_db/
 workspaces/
 data/
+data/personal/
 __pycache__/
 *.pyc
 .DS_Store

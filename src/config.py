@@ -40,6 +40,13 @@ RETRIEVER_TYPE = os.getenv("RETRIEVER_TYPE", "tfidf").lower()
 LLM_RERANK_MAX_CHUNKS = int(os.getenv("LLM_RERANK_MAX_CHUNKS", "12"))
 LLM_RERANK_PREVIEW_CHARS = int(os.getenv("LLM_RERANK_PREVIEW_CHARS", "700"))
 
+# 推理模型：用于最终生成步骤（留空则复用普通对话模型）
+# 推荐：deepseek-reasoner（DeepSeek R1）
+REASONING_MODEL_NAME = os.getenv("REASONING_MODEL_NAME", "").strip()
+
+# Agent 架构：用 function calling 驱动工具选择，替代硬编码 if-else 流程
+ENABLE_AGENT = os.getenv("ENABLE_AGENT", "false").lower() == "true"
+
 # Phase 3：参考文献 / DOI
 ENABLE_REFERENCES = os.getenv("ENABLE_REFERENCES", "true").lower() == "true"
 CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "").strip()

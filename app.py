@@ -24,12 +24,14 @@ from src.chat import (
     chat_reply_local_with_retry,
     chat_reply_web,
     get_llm,
+    get_reasoning_llm,
     repair_legacy_fragment_citations,
     retrieval_query_with_llm,
     should_fallback_to_web,
 )
 from src.config import (
     DATA_DIR,
+    ENABLE_AGENT,
     ENABLE_CORRECTIONS,
     ENABLE_REFERENCES,
     ENABLE_SELF_RAG,
@@ -37,6 +39,7 @@ from src.config import (
     ENABLE_WORKSPACE,
     MIN_RELEVANCE,
     PUBLIC_APP_URL,
+    REASONING_MODEL_NAME,
     REFERENCE_FETCH_META,
     UI_PANEL_HEIGHT,
     USE_LLM_REWRITE_QUERY,
@@ -345,6 +348,29 @@ def current_workspace_id() -> str | None:
 
 def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
     """先查本地资料，不足则联网 + DeepSeek 整理并附 URL。"""
+    # Agent 模式：用 function calling 驱动工具选择
+    if ENABLE_AGENT:
+        from src.agent import run_agent_qa
+        r = run_agent_qa(index, llm, prompt, history)
+        meta = {
+            "best_sim": r["best_sim"],
+            "source_mode": r["source_mode"],
+            "web_count": len(r["web_results"]),
+            "topic_strong": r["topic_strong"],
+            "term_ratio": r["term_ratio"],
+            "match_terms": r["match_terms"],
+            "match_phrases": [],
+            "coverage": 0,
+            "question_mode": "agent",
+            "question_mode_label": "Agent",
+            "self_rag_skip": r["self_rag_skip"],
+            "agent_mode": True,
+        }
+        return r["answer"], r["docs"], r["web_results"], meta, r["rerank_metas"]
+
+    # 推理模型：最终生成步骤单独使用（辅助步骤仍走普通模型）
+    reasoning_llm = get_reasoning_llm() if REASONING_MODEL_NAME else None
+
     if USE_LLM_REWRITE_QUERY:
         search_q = retrieval_query_with_llm(llm, prompt, history)
     else:
@@ -381,7 +407,8 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
     # 1) 本地有匹配 → 先按课件回答（主题匹配时带重试）
     if docs and best_sim > 0:
         local_answer = chat_reply_local_with_retry(
-            llm, prompt, docs, history, topic_strong=topic_strong
+            llm, prompt, docs, history, topic_strong=topic_strong,
+            reasoning_llm=reasoning_llm,
         )
 
         # ── Self-RAG Step 3：答案质量自评 ────────────────────────

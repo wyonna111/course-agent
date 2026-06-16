@@ -6,7 +6,7 @@ import re
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from src.config import MAX_HISTORY_TURNS, MIN_RELEVANCE, USE_LLM_REWRITE_QUERY
+from src.config import MAX_HISTORY_TURNS, MIN_RELEVANCE, USE_LLM_REWRITE_QUERY, REASONING_MODEL_NAME
 from src.loaders import location_label
 from src.addressing_ref import REF_8086_ADDRESSING, is_addressing_table_page
 from src.question_types import detect_answer_mode
@@ -149,6 +149,20 @@ def get_llm() -> ChatOpenAI:
         base_url=os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1"),
         model=os.getenv("MODEL_NAME", "deepseek-chat"),
         temperature=0.25,
+    )
+
+
+def get_reasoning_llm() -> ChatOpenAI:
+    """返回推理模型实例（deepseek-reasoner / R1），用于最终答案生成。
+    未配置 REASONING_MODEL_NAME 时降级为普通对话模型。"""
+    if not REASONING_MODEL_NAME:
+        return get_llm()
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    return ChatOpenAI(
+        api_key=key,
+        base_url=os.getenv("OPENAI_API_BASE", "https://api.deepseek.com/v1"),
+        model=REASONING_MODEL_NAME,
+        temperature=1,  # R1 系列要求 temperature=1
     )
 
 
@@ -315,6 +329,7 @@ def chat_reply_local(
     history: list[dict],
     *,
     force_apply: bool = False,
+    reasoning_llm: ChatOpenAI | None = None,
 ) -> str:
     context = format_context(docs_with_scores)
     system = _pick_local_system(question, force_apply, docs_with_scores)
@@ -323,7 +338,9 @@ def chat_reply_local(
         *_history_messages(history),
         HumanMessage(content=_build_user_content(question, context, docs_with_scores)),
     ]
-    raw = llm.invoke(messages).content
+    # 最终生成用推理模型（若配置），检索/重排等辅助步骤仍用普通模型
+    gen_llm = reasoning_llm if reasoning_llm is not None else llm
+    raw = gen_llm.invoke(messages).content
     return normalize_answer_citations(raw, docs_with_scores)
 
 
@@ -333,16 +350,17 @@ def chat_reply_local_with_retry(
     docs_with_scores: list,
     history: list[dict],
     topic_strong: bool,
+    reasoning_llm: ChatOpenAI | None = None,
 ) -> str:
     """先正常答；概念应用题用专用 prompt；误报未找到时用更强 prompt 重答。"""
-    answer = chat_reply_local(llm, question, docs_with_scores, history)
+    answer = chat_reply_local(llm, question, docs_with_scores, history, reasoning_llm=reasoning_llm)
     if (
         detect_answer_mode(question).skip_web_if_strong is False
         and topic_strong
         and is_insufficient_local_answer(answer)
     ):
         answer = chat_reply_local(
-            llm, question, docs_with_scores, history, force_apply=True
+            llm, question, docs_with_scores, history, force_apply=True, reasoning_llm=reasoning_llm
         )
     return answer
 

@@ -1153,7 +1153,13 @@ def _render_sticky_question(user_msg: dict) -> None:
     q_text = html.escape(user_msg.get("content", "")).replace("\n", "<br/>")
     st.markdown(
         f'<div class="ct-qa-turn"><div class="ct-qa-sticky-q">'
-        f'<span class="ct-q-label">问{author_html}</span>'
+        f'<span class="ct-q-label">问{author_html}</span>',
+        unsafe_allow_html=True,
+    )
+    # 有图片时先展示缩略图
+    if user_msg.get("image_preview"):
+        st.image(user_msg["image_preview"], width=260)
+    st.markdown(
         f'<span class="ct-q-text">{q_text}</span></div>',
         unsafe_allow_html=True,
     )
@@ -1317,11 +1323,38 @@ def process_chat_input(index: DocumentIndex, llm) -> None:
         placeholder = "输入问题，Enter 发送"
     else:
         placeholder = "请先在左侧「资料库」上传并索引资料…"
+
+    # 图片上传（仅在视觉模型启用时显示）
+    from src.vision import is_vision_enabled, describe_image
+    uploaded_image = None
+    if is_vision_enabled() and can_chat:
+        uploaded_image = st.file_uploader(
+            "附上图片提问（可选）",
+            type=["png", "jpg", "jpeg", "webp"],
+            key="chat_image_uploader",
+            label_visibility="collapsed",
+            help="上传题目截图或图片，系统会理解图片内容后检索课件回答",
+        )
+
     prompt = st.chat_input(placeholder, disabled=not can_chat)
-    if not prompt:
+    if not prompt and not uploaded_image:
         return
+    if not prompt:
+        prompt = "请描述并解答图片中的问题。"
+
+    # 图片转文字，拼入 prompt
+    image_preview = None
+    if uploaded_image:
+        image_bytes = uploaded_image.read()
+        image_preview = image_bytes  # 用于气泡展示
+        with st.spinner("正在理解图片内容…"):
+            img_desc = describe_image(image_bytes, mime=uploaded_image.type or "image/png")
+        if img_desc:
+            prompt = f"[图片内容：{img_desc}]\n\n{prompt}"
 
     user_msg: dict = {"role": "user", "content": prompt}
+    if image_preview:
+        user_msg["image_preview"] = image_preview
     if st.session_state.get("member_name"):
         user_msg["author"] = st.session_state.member_name.strip()
     st.session_state.messages.append(user_msg)

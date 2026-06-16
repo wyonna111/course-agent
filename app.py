@@ -32,6 +32,7 @@ from src.config import (
     DATA_DIR,
     ENABLE_CORRECTIONS,
     ENABLE_REFERENCES,
+    ENABLE_SELF_RAG,
     ENABLE_WEB_SEARCH,
     ENABLE_WORKSPACE,
     MIN_RELEVANCE,
@@ -353,7 +354,7 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
 
     # ── Self-RAG Step 1：检索必要性判断 ──────────────────────────
     # 对纯闲聊/问候/与课件无关的问题跳过检索，直接交给 LLM 回答
-    self_rag_skip = not retrieve_decision(llm, prompt)
+    self_rag_skip = ENABLE_SELF_RAG and not retrieve_decision(llm, prompt)
 
     if index.ready and not self_rag_skip:
         docs, best_sim, rerank_metas = index.retriever.similarity_search_multi(
@@ -363,7 +364,7 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
 
         # ── Self-RAG Step 2：片段相关性验证 ──────────────────────
         # 若检索到内容但与问题无关，清空避免干扰回答
-        if docs:
+        if docs and ENABLE_SELF_RAG:
             ctx_preview = " ".join(d.page_content for d, _ in docs[:3])
             if not relevance_check(llm, prompt, ctx_preview):
                 docs, best_sim = [], 0.0
@@ -383,7 +384,7 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
 
         # ── Self-RAG Step 3：答案质量自评 ────────────────────────
         # 若答案质量不足且尚未联网，标记为需要联网补充
-        if local_answer and not answer_quality(llm, prompt, local_answer):
+        if local_answer and ENABLE_SELF_RAG and not answer_quality(llm, prompt, local_answer):
             local_answer = None  # 放弃本地答案，走后续联网逻辑
 
     # 2) 判断是否需要联网（资料主题已匹配时不因 LLM 误报而联网）

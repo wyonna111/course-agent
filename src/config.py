@@ -34,6 +34,7 @@ ENABLE_CORRECTIONS = os.getenv("ENABLE_CORRECTIONS", "true").lower() == "true"
 ENABLE_WORKSPACE = os.getenv("ENABLE_WORKSPACE", "true").lower() == "true"
 USE_LLM_REWRITE_QUERY = os.getenv("USE_LLM_REWRITE_QUERY", "false").lower() == "true"
 ENABLE_LLM_RERANK = os.getenv("ENABLE_LLM_RERANK", "true").lower() == "true"
+ENABLE_SELF_RAG = os.getenv("ENABLE_SELF_RAG", "true").lower() == "true"
 LLM_RERANK_MAX_CHUNKS = int(os.getenv("LLM_RERANK_MAX_CHUNKS", "12"))
 LLM_RERANK_PREVIEW_CHARS = int(os.getenv("LLM_RERANK_PREVIEW_CHARS", "700"))
 

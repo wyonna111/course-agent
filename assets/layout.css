@@ -338,3 +338,38 @@ div[data-testid="stChatInput"] > div {
     background: var(--secondary-background-color) !important;
   }
 }
+
+/* 图片上传：只露出按钮本体，其余全隐藏 */
+div[data-testid="stFileUploader"] {
+  min-height: 0 !important;
+}
+
+div[data-testid="stFileUploader"] > label,
+div[data-testid="stFileUploader"] small,
+div[data-testid="stFileUploaderDropzone"] > div {
+  display: none !important;
+}
+
+div[data-testid="stFileUploaderDropzone"] {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+
+div[data-testid="stFileUploaderDropzone"] button {
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  font-size: 1rem !important;
+}
+
+div[data-testid="stFileUploaderDropzone"] button p,
+div[data-testid="stFileUploaderDropzone"] button span {
+  display: none !important;
+}
+
+div[data-testid="stFileUploaderDropzone"] button::before {
+  content: "📎";
+}

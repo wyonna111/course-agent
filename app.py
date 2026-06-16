@@ -165,6 +165,8 @@ def init_session():
             st.session_state[key] = False
     if "ref_upload_key" not in st.session_state:
         st.session_state.ref_upload_key = 0
+    if "img_upload_key" not in st.session_state:
+        st.session_state.img_upload_key = 0
     if "parsed_references" not in st.session_state:
         st.session_state.parsed_references = []
 
@@ -1205,8 +1207,14 @@ def _render_assistant_message(msg: dict, idx: int) -> None:
 def render_chat_messages(index: DocumentIndex) -> None:
     sync_workspace_messages()
 
+    from src.vision import is_vision_enabled
     web_hint = "资料不足时联网" if ENABLE_WEB_SEARCH else "仅课内资料"
-    _col_title, _col_clear = st.columns([6, 1])
+
+    if is_vision_enabled():
+        _col_title, _col_img, _col_clear = st.columns([6, 1, 1])
+    else:
+        _col_title, _col_clear = st.columns([6, 1])
+
     with _col_title:
         st.markdown(
             f"""
@@ -1222,6 +1230,16 @@ def render_chat_messages(index: DocumentIndex) -> None:
             st.session_state.messages = []
             persist_messages()
             st.rerun()
+
+    if is_vision_enabled():
+        with _col_img:
+            st.file_uploader(
+                "📎",
+                type=["png", "jpg", "jpeg", "webp"],
+                key=f"chat_image_uploader_{st.session_state.img_upload_key}",
+                label_visibility="collapsed",
+                help="附图提问：上传题目截图，系统理解后检索课件回答",
+            )
 
     msgs = st.session_state.messages
     i = 0
@@ -1324,17 +1342,11 @@ def process_chat_input(index: DocumentIndex, llm) -> None:
     else:
         placeholder = "请先在左侧「资料库」上传并索引资料…"
 
-    # 图片上传（仅在视觉模型启用时显示）
     from src.vision import is_vision_enabled, describe_image
-    uploaded_image = None
-    if is_vision_enabled() and can_chat:
-        uploaded_image = st.file_uploader(
-            "附上图片提问（可选）",
-            type=["png", "jpg", "jpeg", "webp"],
-            key="chat_image_uploader",
-            label_visibility="collapsed",
-            help="上传题目截图或图片，系统会理解图片内容后检索课件回答",
-        )
+
+    # 图片从 header 区的 file_uploader 读取（动态 key 保证发送后自动清空）
+    img_key = f"chat_image_uploader_{st.session_state.img_upload_key}"
+    uploaded_image = st.session_state.get(img_key) if is_vision_enabled() else None
 
     prompt = st.chat_input(placeholder, disabled=not can_chat)
     if not prompt and not uploaded_image:
@@ -1346,7 +1358,7 @@ def process_chat_input(index: DocumentIndex, llm) -> None:
     image_preview = None
     if uploaded_image:
         image_bytes = uploaded_image.read()
-        image_preview = image_bytes  # 用于气泡展示
+        image_preview = image_bytes
         with st.spinner("正在理解图片内容…"):
             img_desc = describe_image(image_bytes, mime=uploaded_image.type or "image/png")
         if img_desc:
@@ -1359,6 +1371,8 @@ def process_chat_input(index: DocumentIndex, llm) -> None:
         user_msg["author"] = st.session_state.member_name.strip()
     st.session_state.messages.append(user_msg)
     persist_messages()
+    # 递增 key，下次渲染时 file_uploader 重置为空
+    st.session_state.img_upload_key += 1
     st.session_state.qa_job_active = True
     st.rerun()
 

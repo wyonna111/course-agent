@@ -5,9 +5,16 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.config import CHUNK_OVERLAP, CHUNK_SIZE, DATA_DIR
+from src.config import CHUNK_OVERLAP, CHUNK_SIZE, DATA_DIR, RETRIEVER_TYPE
 from src.loaders import load_documents, location_label
 from src.retriever import TfidfRetriever
+
+
+def _make_retriever(chunks: list[Document]):
+    if RETRIEVER_TYPE == "embedding":
+        from src.embedding_retriever import EmbeddingRetriever
+        return EmbeddingRetriever(chunks)
+    return TfidfRetriever(chunks)
 
 
 def split_documents(docs: list[Document]) -> list[Document]:
@@ -64,7 +71,7 @@ class DocumentIndex:
             self.indexed_files.remove(name)
         self.chunks.extend(new_chunks)
         self.indexed_files.append(name)
-        self.retriever = TfidfRetriever(self.chunks)
+        self.retriever = _make_retriever(self.chunks)
         return {
             "file": name,
             "new_chunks": len(new_chunks),

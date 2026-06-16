@@ -31,7 +31,6 @@ from src.chat import (
 )
 from src.config import (
     DATA_DIR,
-    ENABLE_AGENT,
     ENABLE_CORRECTIONS,
     ENABLE_REFERENCES,
     ENABLE_SELF_RAG,
@@ -348,26 +347,6 @@ def current_workspace_id() -> str | None:
 
 def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
     """先查本地资料，不足则联网 + DeepSeek 整理并附 URL。"""
-    # Agent 模式：用 function calling 驱动工具选择
-    if ENABLE_AGENT:
-        from src.agent import run_agent_qa
-        r = run_agent_qa(index, llm, prompt, history)
-        meta = {
-            "best_sim": r["best_sim"],
-            "source_mode": r["source_mode"],
-            "web_count": len(r["web_results"]),
-            "topic_strong": r["topic_strong"],
-            "term_ratio": r["term_ratio"],
-            "match_terms": r["match_terms"],
-            "match_phrases": [],
-            "coverage": 0,
-            "question_mode": "agent",
-            "question_mode_label": "Agent",
-            "self_rag_skip": r["self_rag_skip"],
-            "agent_mode": True,
-        }
-        return r["answer"], r["docs"], r["web_results"], meta, r["rerank_metas"]
-
     # 推理模型：最终生成步骤单独使用（辅助步骤仍走普通模型）
     reasoning_llm = get_reasoning_llm() if REASONING_MODEL_NAME else None
 

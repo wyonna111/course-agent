@@ -60,8 +60,7 @@ def _load_pdf(file_path: Path) -> list[Document]:
         docs = []
         for i, page_obj in enumerate(pdf):
             text = (page_obj.get_text() or "").strip()
-            if len(text) < MIN_TEXT_LEN:
-                text = text or "（本页未提取到可检索文字，可能为图片或空白页）"
+            has_text = len(text) >= MIN_TEXT_LEN
 
             image_descs = []
             if vision_on:
@@ -75,8 +74,13 @@ def _load_pdf(file_path: Path) -> list[Document]:
                                 image_descs.append(desc)
                     except Exception:
                         pass
-            if image_descs:
+
+            if has_text and image_descs:
                 text += "\n[图片内容：" + "；".join(image_descs) + "]"
+            elif not has_text and image_descs:
+                text = "[图片页]\n" + "；".join(image_descs)
+            elif not has_text:
+                text = "（本页未提取到可检索文字，可能为图片或空白页）"
 
             docs.append(
                 Document(
@@ -139,10 +143,9 @@ def _load_pptx(file_path: Path) -> list[Document]:
             if hasattr(shape, "text") and shape.text:
                 parts.append(shape.text.strip())
         text = "\n".join(parts).strip()
-        if len(text) < MIN_TEXT_LEN:
-            text = text or "（本幻灯片未提取到可检索文字，可能为图片页）"
+        has_text = len(text) >= MIN_TEXT_LEN
 
-        # 图片理解：提取图片 → 生成描述 → 追加到正文
+        # 图片理解：提取图片 → 生成描述
         image_descs: list[str] = []
         if vision_on:
             for img_bytes in _extract_pptx_images(slide):
@@ -150,8 +153,15 @@ def _load_pptx(file_path: Path) -> list[Document]:
                 if desc:
                     image_descs.append(desc)
 
-        if image_descs:
+        if has_text and image_descs:
+            # 有文字也有图：图片描述追加在文字后
             text += "\n[图片内容：" + "；".join(image_descs) + "]"
+        elif not has_text and image_descs:
+            # 图片版幻灯片：视觉描述作为主体内容
+            text = "[图片页]\n" + "；".join(image_descs)
+        elif not has_text:
+            # 无文字也无图（空白页或未启用视觉）
+            text = "（本幻灯片未提取到可检索文字，可能为图片页）"
 
         docs.append(
             Document(

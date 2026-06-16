@@ -57,6 +57,7 @@ from src.chat_history import (
     sanitize_chat_messages,
 )
 from src.indexer import DocumentIndex
+from src.self_rag import answer_quality, relevance_check, retrieve_decision
 from src.loaders import location_label
 from src.question_types import detect_answer_mode
 from src.references import (
@@ -350,11 +351,23 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
     rerank_metas: list[dict] = []
     topic_info = {"strong": False, "term_ratio": 0.0, "best_sim": 0.0, "terms": []}
 
-    if index.ready:
+    # ── Self-RAG Step 1：检索必要性判断 ──────────────────────────
+    # 对纯闲聊/问候/与课件无关的问题跳过检索，直接交给 LLM 回答
+    self_rag_skip = not retrieve_decision(llm, prompt)
+
+    if index.ready and not self_rag_skip:
         docs, best_sim, rerank_metas = index.retriever.similarity_search_multi(
             prompt, llm=llm
         )
         docs = apply_corrections_to_docs(docs, current_workspace_id())
+
+        # ── Self-RAG Step 2：片段相关性验证 ──────────────────────
+        # 若检索到内容但与问题无关，清空避免干扰回答
+        if docs:
+            ctx_preview = " ".join(d.page_content for d, _ in docs[:3])
+            if not relevance_check(llm, prompt, ctx_preview):
+                docs, best_sim = [], 0.0
+
         topic_info = index.retriever.local_topic_match(prompt, docs)
 
     local_answer: str | None = None
@@ -367,6 +380,11 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
         local_answer = chat_reply_local_with_retry(
             llm, prompt, docs, history, topic_strong=topic_strong
         )
+
+        # ── Self-RAG Step 3：答案质量自评 ────────────────────────
+        # 若答案质量不足且尚未联网，标记为需要联网补充
+        if local_answer and not answer_quality(llm, prompt, local_answer):
+            local_answer = None  # 放弃本地答案，走后续联网逻辑
 
     # 2) 判断是否需要联网（资料主题已匹配时不因 LLM 误报而联网）
     answer_mode = detect_answer_mode(prompt)
@@ -410,6 +428,7 @@ def run_qa(index: DocumentIndex, llm, prompt: str, history: list[dict]):
         "coverage": topic_info.get("coverage", 0),
         "question_mode": answer_mode.id,
         "question_mode_label": answer_mode.label,
+        "self_rag_skip": self_rag_skip,
     }
     return answer, docs, web_results, meta, rerank_metas
 

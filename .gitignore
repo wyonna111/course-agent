@@ -19,3 +19,10 @@ streamlit_run.log
 
 # 参考文献上传缓存
 _ref_upload/
+
+# 测评数据与可视化
+eval/plot_*.py
+eval/figures/
+eval/*.json
+eval/*.txt
+eval/*.md

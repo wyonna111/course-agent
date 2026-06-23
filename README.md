@@ -243,4 +243,11 @@ python eval/plot_all_figures.py
 
 ## 致谢
 
-感谢课程提供的算法实践框架与嵌入式相关课件；本项目使用 Streamlit、PyMuPDF、scikit-learn、matplotlib 等开源组件。特别感谢 DeepSeek 提供的 API 服务和 BAAI 提供的 BGE 中文语义模型。
+本项目为**人工智能算法实践**课程大作业，感谢授课教师在项目选题、技术路线、实验设计等方面提供的悉心指导与帮助。
+
+感谢课程提供的算法实践框架与嵌入式相关课件，为本项目的开发与测试提供了重要支撑。
+
+技术致谢：
+- **DeepSeek**：提供高性能的 API 服务，支持语义重排与推理增强
+- **BAAI**：提供 BGE 中文语义模型，实现精准的向量检索
+- **开源社区**：Streamlit、PyMuPDF、scikit-learn、matplotlib 等组件为项目实现提供了坚实基础

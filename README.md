@@ -79,7 +79,7 @@
 
 ## 系统性能（实验结果）
 
-基于 100 道操作系统课程测试题的评测结果：
+基于 100 道嵌入式课程测试题的评测结果：
 
 | 指标 | 完整系统 | TF-IDF 基线 | 提升幅度 |
 |------|---------|-----------|---------|
@@ -243,4 +243,4 @@ python eval/plot_all_figures.py
 
 ## 致谢
 
-感谢课程提供的算法实践框架与操作系统等相关课件；本项目使用 Streamlit、PyMuPDF、scikit-learn、matplotlib 等开源组件。特别感谢 DeepSeek 提供的 API 服务和 BAAI 提供的 BGE 中文语义模型。
+感谢课程提供的算法实践框架与嵌入式相关课件；本项目使用 Streamlit、PyMuPDF、scikit-learn、matplotlib 等开源组件。特别感谢 DeepSeek 提供的 API 服务和 BAAI 提供的 BGE 中文语义模型。

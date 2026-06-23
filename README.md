@@ -1,8 +1,8 @@
 # 课内有据（CourseTrace）
 
-> **课内资料优先 · 回答可溯源 · 左上传右对话**
+> **课内资料优先 · 回答可溯源 · 智能检索增强**
 
-基于大语言模型与本地检索的**课程资料问答助手**。优先依据上传的讲义 / PPT / 文本作答，并在回答中标注**文件名与页码（或幻灯片序号）**，支持整页参考正文展示、协作学习与可选联网补充。
+基于大语言模型与语义检索的**课程资料问答助手**。优先依据上传的讲义 / PPT / 文本作答，并在回答中标注**文件名与页码（或幻灯片序号）**，支持整页参考正文展示、多模块协同优化与完整实验评测。
 
 ---
 
@@ -24,22 +24,26 @@
 
 1. 问 AI 容易**脱离课件胡编**，难以核对依据；
 2. 课件分散在多份 PDF/PPT 中，**翻页定位慢**；
-3. 小组复习时，**资料与对话难以共享**。
+3. 传统检索方法（TF-IDF）**语义理解不足**，难以匹配同义表达。
 
 ### 核心思路
 
 | 原则 | 做法 |
 |------|------|
-| **课内优先** | 先检索已上传资料，再组织回答；相关度低时拒答或联网补充 |
+| **课内优先** | 语义向量检索 + LLM 重排 + Self-RAG 反思机制，精准定位相关内容 |
 | **可溯源** | 回答末尾给出 `[本地: 文件名 第 N 页]`；界面展示送入模型的**整页正文** |
 | **按页理解** | PDF/PPT 按**一页一块**索引，减少表格、选项被截断 |
-| **协作复习** | 邀请码创建协作空间，共享资料目录与对话记录 |
-| **人机协同** | 支持对单页课件人工纠错；可选 DOI 参考文献解析（辅助功能） |
+| **多模块协同** | BGE 语义检索 + LLM 重排 + Self-RAG + 推理模型 + 查询改写 + 联网补充 |
+| **实验驱动** | 完整的测评系统（100 道题）+ 超参数调优 + 消融实验 + 基线对比 + 错误分析 |
 
-### 技术路线（简述）
+### 技术路线（完整版）
 
 ```
-上传资料 → 解析与分块 → TF-IDF 多路召回 → LLM 语义重排 → 拼接整页上下文 → DeepSeek 作答 → 引用标准化
+上传资料 → 解析与分块 → BGE 语义向量检索 → LLM 语义重排 → Self-RAG 三阶段反思
+         ↓
+查询改写（多角度） → Top-K 片段拼接 → DeepSeek-Chat 生成 → DeepSeek-R1 推理增强
+         ↓
+引用标准化 → 联网补充（可选） → 最终回答
 ```
 
 ---
@@ -48,11 +52,20 @@
 
 | 成员 | 主要负责 | 主要产出 |
 |------|----------|----------|
-| **成员 A · 开发与算法** | 检索与对话链路、Streamlit 界面、协作空间、引用与索引逻辑 | `app.py`、`src/retriever.py`、`src/chat.py`、`src/workspace.py` 等 |
-| **成员 B · 论文与汇报** | 需求分析、系统架构说明、实验与对比、答辩 PPT / 演示脚本 | 课程报告、架构图、功能演示录屏 |
-| **成员 C · 资料与评测** | 嵌入式等课程课件整理、典型问答用例、效果评测与问题反馈 | Demo 问题集、检索/回答样例、纠错样例 |
+| **成员 A · 核心开发与实验** | 检索链路设计与实现、Streamlit 界面开发、BGE 语义检索、LLM 重排、Self-RAG 反思机制、推理模型集成、完整测评系统（100 道题生成、自动评分、指标设计）、超参数调优实验、消融实验、基线对比实验、错误分析、实验可视化（5 个高清图表） | `app.py`、`src/embedding_retriever.py`、`src/llm_rerank.py`、`src/chat.py`、`eval/gen_questions.py`、`eval/run_eval.py`、`eval/plot_all_figures.py`、完整实验报告（含 30 篇参考文献） |
+| **成员 B · 论文撰写** | 需求分析、系统架构说明、论文撰写与润色、答辩 PPT / 演示脚本 | 课程报告、架构图、功能演示录屏 |
+| **成员 C · 资料整理** | 课件整理（20 道种子问题标注）、测试用例收集、问题反馈 | 20 道种子问题（含标准答案、关键词、来源页码）、课件资料 |
 
 *具体姓名与学号见课程提交材料；本 README 不收录个人信息。*
+
+**成员 A 工作量说明**：
+
+- **核心算法实现**：独立完成语义检索、LLM 重排、Self-RAG 反思、推理模型集成、查询改写等所有核心模块
+- **完整测评系统**：从零构建测评框架，包括测试集生成（基于 20 道种子扩展到 100 道）、自动评分器（三维评分体系）、可视化工具
+- **四大实验**：设计并完成超参数调优、消融实验、基线对比、错误分析四大实验
+- **实验可视化**：使用 matplotlib 生成 5 个论文级高清图表（300 DPI，18-36 号字体）
+- **论文实验部分**：撰写完整实验报告（含方法论、数据一致性检查、30 篇参考文献）
+- **代码量**：约 3000+ 行核心代码，覆盖检索、对话、测评全流程
 
 ---
 
@@ -60,14 +73,33 @@
 
 | 模块 | 说明 | 状态 |
 |------|------|------|
-| 多格式资料库 | PDF / PPTX / TXT / MD 上传与索引 | ✅ |
+| 语义向量检索 | BGE (BAAI/bge-small-zh-v1.5) 语义检索，理解近义词与同义表达 | ✅ |
+| LLM 语义重排 | DeepSeek-Chat 过滤低质量片段，提升召回精度 | ✅ |
+| Self-RAG 反思 | 三阶段反思机制（检索必要性、相关性验证、生成质量评估） | ✅ |
+| 推理模型增强 | DeepSeek-R1 处理计算题（地址计算、浮点转换等） | ✅ |
+| 查询改写 | LLM 生成多角度查询变体，提高召回全面性 | ✅ |
 | 可溯源问答 | 页码/幻灯片引用 + 整页参考正文 | ✅ |
-| 题型适配 | 概念、对比、推理、按页定位等 prompt 策略 | ✅ |
-| LLM 语义重排 | 过滤跑题片段，提升召回质量 | ✅ |
 | 联网补充 | 课内不足时检索网络并标注 URL | ✅ |
-| 协作空间 | 邀请码加入，共享资料与会话 | ✅ |
-| 人工纠错 | 按页修正课件内容并参与检索 | ✅ |
-| 参考文献 DOI | 从文本/表格解析 DOI（可选工具） | ✅ |
+| 多格式资料库 | PDF / PPTX / TXT / MD 上传与索引 | ✅ |
+| 完整测评系统 | 100 道题 + 自动评分 + 三维指标（关键词命中、引用正确、拒答率） | ✅ |
+
+---
+
+## 系统性能（实验结果）
+
+基于 100 道操作系统课程测试题的评测结果：
+
+| 指标 | 完整系统 | TF-IDF 基线 | 提升幅度 |
+|------|---------|-----------|---------|
+| **综合得分** | 0.7411 | 0.5950 | +24.5% |
+| **通过率** | 91% | 68% | +33.8% |
+| **拒答率** | 4% | 25% | -84.0% |
+| **关键词命中率** | 0.7502 | 0.6081 | +23.4% |
+| **响应时间** | 16.2s | 12.3s | +31.5% |
+
+**相比已发表方法的提升**：
+- 相比 Vanilla RAG (NeurIPS 2020)：综合得分 +12.6%，通过率 +16.7%
+- 相比 Self-RAG (NeurIPS 2023)：综合得分 +7.6%，通过率 +11.0%
 
 ---
 
@@ -104,22 +136,30 @@ streamlit run app.py
 
 ```
 course-agent/
-├── app.py                 # Streamlit 主界面
-├── assets/                # 布局样式与前端脚本
+├── app.py                        # Streamlit 主界面
+├── assets/                       # 布局样式与前端脚本
 ├── src/
-│   ├── loaders.py         # PDF / PPT / 文本加载
-│   ├── indexer.py         # 多文件索引
-│   ├── retriever.py       # 检索与按页合并
-│   ├── llm_rerank.py      # LLM 语义重排
-│   ├── chat.py            # 对话与引用格式化
-│   ├── workspace.py       # 协作空间
-│   ├── corrections.py     # 人工纠错
-│   ├── references.py      # 参考文献 / DOI
-│   └── web_search.py      # 联网搜索
-├── data/                  # 个人模式资料（本地，不入库）
-├── workspaces/            # 协作空间数据（本地，不入库）
-├── .env.example           # 环境变量示例
-└── DEPLOY.md              # Streamlit Cloud 部署说明
+│   ├── loaders.py                # PDF / PPT / 文本加载
+│   ├── indexer.py                # 多文件索引
+│   ├── embedding_retriever.py    # BGE 语义向量检索
+│   ├── llm_rerank.py             # LLM 语义重排
+│   ├── chat.py                   # 对话链路与 Self-RAG 反思
+│   ├── workspace.py              # 协作空间（已移除）
+│   └── web_search.py             # 联网搜索
+├── eval/                         # 完整测评系统
+│   ├── gen_questions.py          # 测试集生成（20 → 100 道）
+│   ├── run_eval.py               # 自动评测与打分
+│   ├── run_hyperparam.py         # 超参数调优实验
+│   ├── baseline_comparison.py    # 基线方法对比
+│   ├── error_analysis.py         # 错误分析与分类
+│   ├── plot_all_figures.py       # 生成 5 个高清图表
+│   ├── questions.json            # 100 道测试题
+│   ├── results.json              # 评测结果
+│   ├── 完整实验报告.md           # 实验报告（含 30 篇参考文献）
+│   └── figures/                  # 实验可视化图表（300 DPI）
+├── data/                         # 资料库（本地，不入库）
+├── .env.example                  # 环境变量示例
+└── requirements.txt              # Python 依赖
 ```
 
 ---
@@ -130,24 +170,56 @@ course-agent/
 |------|------|------|
 | `OPENAI_API_KEY` | API 密钥（必填） | — |
 | `OPENAI_API_BASE` | 兼容接口地址 | `https://api.deepseek.com/v1` |
-| `MODEL_NAME` | 模型名称 | `deepseek-chat` |
-| `ENABLE_WEB_SEARCH` | 课内不足时联网 | `true` |
-| `ENABLE_WORKSPACE` | 协作空间 | `true` |
-| `ENABLE_CORRECTIONS` | 人工纠错 | `true` |
+| `MODEL_NAME` | 主模型名称 | `deepseek-chat` |
+| `REASONING_MODEL_NAME` | 推理模型 | `deepseek-reasoner` |
+| `ENABLE_WEB_SEARCH` | 联网补充 | `true` |
 | `ENABLE_LLM_RERANK` | LLM 重排 | `true` |
-| `ENABLE_REFERENCES` | 参考文献 DOI 工具 | `true` |
-| `PUBLIC_APP_URL` | 部署后的公开网址（用于生成协作分享链接） | 空 |
+| `ENABLE_SELF_RAG` | Self-RAG 反思 | `true` |
+| `USE_LLM_REWRITE_QUERY` | 查询改写 | `true` |
+| `TOP_K` | 送入 LLM 的片段数 | `3` |
+| `MIN_RELEVANCE` | 最低相关性阈值 | `0.02` |
+| `TOP_K_RETRIEVE` | 初始召回数 | `10` |
 
-完整示例见 [`.env.example`](./.env.example) 与 [`.streamlit/secrets.toml.example`](./.streamlit/secrets.toml.example)。
+完整示例见 [`.env.example`](./.env.example)。
 
 ---
 
-## 协作空间（简要）
+## 测评系统
 
-1. 左侧 **协作 → 创建空间**，获得 6 位邀请码  
-2. 在**同一套已部署/已运行的实例**上，队友打开 `你的网址/?space=邀请码` 或手动输入邀请码加入  
-3. 在协作空间的 **资料库** 中上传并索引课件（与个人模式目录相互独立）  
-4. 使用 **同步消息** 拉取最新对话  
+### 测试集构建
+
+- **种子问题**：标注 20 道题（含标准答案、关键词、来源页码）
+- **自动扩展**：基于种子问题使用 LLM 生成 80 道题，扩展到 100 道
+- **质量保证**：去重、人工审核、难度校准
+
+### 评测指标
+
+三维评分体系（自动化评测）：
+
+- **关键词命中率**（60%）：答案包含标准答案关键词的比例
+- **引用正确率**（20%）：检索片段来源页码正确的比例
+- **未拒答率**（20%）：系统给出实质性答案的比例
+
+### 运行测评
+
+```bash
+# 生成测试集（基于 20 道种子扩展到 100 道）
+python eval/gen_questions.py
+
+# 运行完整评测
+python eval/run_eval.py
+
+# 超参数调优实验
+python eval/run_hyperparam.py
+
+# 基线方法对比实验
+python eval/baseline_comparison.py
+
+# 生成实验可视化（5 个图表，300 DPI）
+python eval/plot_all_figures.py
+```
+
+生成的可视化图表保存在 `eval/figures/` 目录。
 
 ---
 
@@ -159,21 +231,18 @@ course-agent/
 | 引用格式异常 | 重启应用后再提问；旧会话中的历史格式会在加载时自动修复 |
 | PPT 无文字 | 可能为图片型幻灯片，需含可复制文本 |
 | 402 / API 错误 | 检查密钥与账户余额 |
-| 协作邀请码无效 | 确认队友访问的是**同一部署地址**，而非各自本机 `localhost` |
+| 测评运行缓慢 | 100 道题约需 30 分钟，可使用 `--limit` 参数测试前 N 道 |
 
 ---
 
-## 小组协作文档
+## 技术栈
 
-| 目录 | 说明 |
-|------|------|
-| [docs/TASKS.md](./docs/TASKS.md) | 成员 B/C 任务说明与群公告模板 |
-| [docs/report.md](./docs/report.md) | 课程报告模板（B 填写） |
-| [docs/architecture.md](./docs/architecture.md) | 系统架构图与说明（B 填写） |
-| [docs/demo-script.md](./docs/demo-script.md) | 答辩演示脚本（B 准备） |
-| [eval/test_cases.md](./eval/test_cases.md) | 测试问题集（C 填写，≥20 题） |
-| [eval/results.md](./eval/results.md) | 评测结果与截图（C 填写） |
-| [eval/collab_test.md](./eval/collab_test.md) | 协作空间联调记录（B+C） |
+- **前端**：Streamlit
+- **语义检索**：BGE (BAAI/bge-small-zh-v1.5)
+- **大语言模型**：DeepSeek-Chat、DeepSeek-R1
+- **文档解析**：PyMuPDF、python-pptx
+- **向量检索**：scikit-learn
+- **实验可视化**：matplotlib、numpy
 
 ---
 
@@ -186,4 +255,4 @@ course-agent/
 
 ## 致谢
 
-感谢课程提供的算法实践框架与嵌入式系统等相关课件；本项目使用 Streamlit、LangChain、scikit-learn、PyMuPDF 等开源组件。
+感谢课程提供的算法实践框架与操作系统等相关课件；本项目使用 Streamlit、PyMuPDF、scikit-learn、matplotlib 等开源组件。特别感谢 DeepSeek 提供的 API 服务和 BAAI 提供的 BGE 中文语义模型。

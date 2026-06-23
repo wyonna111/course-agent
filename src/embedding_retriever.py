@@ -42,6 +42,11 @@ def _load_model():
         raise ImportError(
             "请安装 sentence-transformers：pip install sentence-transformers"
         ) from e
+
+    # 使用清华 HuggingFace 镜像（国内高速访问）
+    import os
+    os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
     return SentenceTransformer("BAAI/bge-small-zh-v1.5")
 
 
